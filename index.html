@@ -90,6 +90,17 @@ button{cursor:pointer}
 .seg button.on{background:#fff;color:var(--bec)}
 
 /* ---------- empty state ---------- */
+.boot{margin-top:56px;background:var(--card);border:1px solid var(--rule-soft);border-radius:14px;
+  box-shadow:var(--shadow);padding:52px 34px;text-align:center}
+.boot h2{font-family:"Archivo",sans-serif;font-size:20px;font-weight:600;margin:0 0 8px;color:var(--bec-dk)}
+.boot p{color:var(--ink-2);max-width:620px;margin:0 auto;font-size:13.5px}
+.boot .btn{background:var(--bec);border-color:var(--bec);color:#fff;margin-top:18px}
+.boot .btn:hover{background:var(--bec-lt);border-color:var(--bec-lt)}
+.boot.err h2{color:var(--expired)}
+.boot-spin{width:30px;height:30px;margin:0 auto 18px;border-radius:50%;
+  border:3px solid var(--rule-soft);border-top-color:var(--bec);animation:spin .8s linear infinite}
+.boot.err .boot-spin,.boot.done .boot-spin{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
 .drop{
   margin-top:44px;border:2px dashed var(--rule);border-radius:14px;background:var(--card);
   padding:56px 34px;text-align:center;transition:border-color .15s,background .15s;
@@ -204,6 +215,7 @@ button{cursor:pointer}
 .t-critical{background:var(--g-critical)}
 .t-due{background:var(--g-due);color:#3f2d00}
 .t-valid{background:var(--g-valid)}
+.t-na{background:#aeb7c7;box-shadow:none}
 .rowbar{width:5px;padding:0!important}
 .no-rows{padding:36px;text-align:center;color:var(--ink-3)}
 .foot{margin-top:16px;font-size:12px;color:var(--ink-3);display:flex;
@@ -319,65 +331,20 @@ button{cursor:pointer}
       </div>
     </div>
     <div class="tools">
-      <button class="btn btn-solid" id="btnPick">Upload license file</button>
-      <input type="file" id="file" accept=".xlsx,.xls,.csv" class="hide">
-      <button class="btn" id="btnTemplate">Download template</button>
-      <button class="btn" id="btnScan">Read PDFs from folder</button>
-      <button class="btn" id="btnLink">Link folder on this PC</button>
-      <button class="btn" id="btnDrive">Get files from Drive</button>
-      <input type="file" id="copyFolder" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff" multiple webkitdirectory directory class="hide">
-      <input type="file" id="pdfFolder" accept="application/pdf,.pdf" multiple webkitdirectory directory class="hide">
-      <button class="btn" id="btnSample">Load sample</button>
-      <div class="seg" title="How to read dates like 03/09/2026">
-        <button id="dfDay" class="on">Day first</button>
-        <button id="dfMonth">Month first</button>
-      </div>
+      <button class="btn btn-solid" id="btnRefresh">Refresh from Drive</button>
       <button class="btn" id="btnPrint">Print</button>
+      <button class="btn" id="btnSettings" title="Drive connection">&#9881;</button>
     </div>
-  </div>
 </header>
 
 <div class="wrap">
 
   <section id="empty">
-    <div class="drop" id="drop">
-      <h2>Drop your license register here</h2>
-      <p>Excel or CSV. One row per branch, or one row per license — both layouts are read automatically.</p>
-      <button class="btn btn-solid" id="btnPick2">Choose file</button>
-      <div class="fmt">
-        <h3>Accepted layouts</h3>
-        <ul>
-          <li><strong>One row per branch:</strong> <code>Branch Name</code>, <code>Commercial License No</code>, <code>Commercial Expiry</code>, <code>Fire License No</code>, <code>Fire Expiry</code>, <code>Signboard License No</code>, <code>Signboard Expiry</code></li>
-          <li><strong>One row per license:</strong> <code>Branch Name</code>, <code>License Type</code>, <code>License No</code>, <code>Expiry Date</code></li>
-          <li>A <code>Branch Code</code> column is shown under the name if present. Dates can be Excel dates, <code>dd/mm/yyyy</code>, <code>yyyy-mm-dd</code> or <code>15-Mar-2027</code>.</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <section class="panel scan hide" id="scanPanel">
-    <div class="scan-head">
-      <div>
-        <h2>PDF scan &mdash; check before applying</h2>
-        <span class="sub">Read straight from the license files. Correct anything flagged, then apply.</span>
-      </div>
-      <div class="legend">
-        <span class="pill good">read</span>
-        <span class="pill maybe">guessed</span>
-        <span class="pill bad">needs you</span>
-      </div>
-    </div>
-    <div class="bar"><i id="scanBar"></i></div>
-    <div class="scan-status" id="scanStatus"></div>
-    <div style="overflow-x:auto"><table class="rev"><thead><tr>
-      <th>File</th><th>Branch</th><th>Type</th><th>Expiry (dd/mm/yyyy)</th><th>License no.</th><th>Other dates found</th><th>Read</th>
-    </tr></thead><tbody id="revBody"></tbody></table></div>
-    <div class="scan-actions">
-      <button class="btn btn-solid" id="btnApplyScan">Apply to dashboard</button>
-      <button class="btn" id="btnExportScan">Export as CSV</button>
-      <button class="btn" id="btnCloseScan">Discard</button>
-      <span class="spacer"></span>
-      <span class="sub" id="scanHint"></span>
+    <div class="boot">
+      <div class="boot-spin" id="bootSpin"></div>
+      <h2 id="bootTitle">Connecting to Google Drive…</h2>
+      <p id="bootMsg">Reading the licence register and copies from the BEC LICENSES folder.</p>
+      <button class="btn hide" id="btnBootRetry">Try again</button>
     </div>
   </section>
 
@@ -461,6 +428,7 @@ button{cursor:pointer}
         <option value="due">31 – 90 days</option>
         <option value="valid">Over 90 days</option>
         <option value="missing">Missing date</option>
+        <option value="na">Not applicable</option>
       </select>
       <select id="sort">
         <option value="soonest">Sort: most urgent first</option>
@@ -546,6 +514,8 @@ function build(y,mo,d){
 function strip(d){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setHours(0,0,0,0);return x;}
 function daysTo(d){return Math.round((d-TODAY)/86400000);}
 function fmt(d){return d? (('0'+d.getDate()).slice(-2)+' '+MONTHS[d.getMonth()]+' '+d.getFullYear()) : '';}
+var NA_RE=/^\s*(n\.?\s*\/?\s*a\.?|not\s*applicable|not\s*required|nil|none|na|-+|\*+)\s*$/i;
+function isNA(v){ return v!=null && NA_RE.test(String(v)); }
 function bucketOf(days){
   if(days===null) return 'missing';
   if(days<0) return 'expired';
@@ -674,12 +644,13 @@ function canonType(t){
 function buildRows(){
   var map={};
   RAW.forEach(function(o){
-    var d=parseDate(o.raw);
+    var na=isNA(o.raw);
+    var d=na?null:parseDate(o.raw);
     var days=d?daysTo(d):null;
     var key=o.branch.toLowerCase();
     if(!map[key]) map[key]={branch:o.branch,code:o.code||'',cells:{}};
     if(!map[key].code && o.code) map[key].code=o.code;
-    map[key].cells[o.type]={number:o.number,date:d,days:days,bucket:bucketOf(days)};
+    map[key].cells[o.type]={number:o.number,date:d,days:days,na:na,bucket:na?'na':bucketOf(days)};
   });
   ROWS=Object.keys(map).map(function(k){
     var r=map[k];
@@ -695,8 +666,12 @@ function buildRows(){
 
 /* ============ render ============ */
 function counts(){
-  var c={expired:0,critical:0,due:0,valid:0,missing:0};
-  RAW.forEach(function(o){ c[bucketOf(parseDate(o.raw)?daysTo(parseDate(o.raw)):null)]++; });
+  var c={expired:0,critical:0,due:0,valid:0,missing:0,na:0};
+  RAW.forEach(function(o){
+    if(isNA(o.raw)){ c.na++; return; }
+    var d=parseDate(o.raw);
+    c[bucketOf(d?daysTo(d):null)]++;
+  });
   return c;
 }
 function renderAll(){ renderKpis(); renderRunway(); renderTypeFilter(); renderMatrix(); }
@@ -720,6 +695,7 @@ function renderRunway(){
   }
   var beyond=0;
   RAW.forEach(function(o){
+    if(isNA(o.raw)) return;
     var d=parseDate(o.raw); if(!d) return;
     if(daysTo(d)<0){cols[0].counts[o.type]=(cols[0].counts[o.type]||0)+1;return;}
     var k=d.getFullYear()+'-'+d.getMonth();
@@ -821,7 +797,7 @@ function renderMatrix(){
     var tr=document.createElement('tr');
     var worstB=bucketOf(r.worst);
     var bar=document.createElement('td'); bar.className='rowbar';
-    bar.style.background='var(--'+(worstB==='missing'?'none':worstB)+')';
+    bar.style.background='var(--'+((worstB==='missing'||worstB==='na')?'none':worstB)+')';
     tr.appendChild(bar);
     var td=document.createElement('td');
     td.innerHTML='<span class="br-name">'+esc(r.branch)+'</span>'+(r.code?'<span class="br-sub">'+esc(r.code)+'</span>':'');
@@ -829,6 +805,9 @@ function renderMatrix(){
     TYPES.forEach(function(t){
       var c=r.cells[t], cell=document.createElement('td');
       if(!c){ cell.innerHTML='<span class="cell-empty">—</span>'; }
+      else if(c.na){
+        cell.innerHTML='<span class="tag t-na">not applicable</span>';
+      }
       else if(!c.date){
         cell.innerHTML='<span class="tag t-expired">no date</span>'+(c.number?'<span class="cell-no">'+esc(c.number)+'</span>':'');
       } else {
@@ -856,11 +835,11 @@ function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp
 /* ============ export ============ */
 function exportCsv(){
   var rows=[['Branch name','Branch code','License type','License number','Expiry date','Days remaining','Status']];
-  var labels={expired:'Expired',critical:'Within 30 days',due:'31-90 days',valid:'Over 90 days',missing:'Missing date'};
+  var labels={expired:'Expired',critical:'Within 30 days',due:'31-90 days',valid:'Over 90 days',missing:'Missing date',na:'Not applicable'};
   visibleRows().forEach(function(r){
     TYPES.forEach(function(t){
       var c=r.cells[t]; if(!c||!cellMatches(c,t)) return;
-      rows.push([r.branch,r.code||'',t,c.number||'',c.date?fmt(c.date):'',c.days===null?'':c.days,labels[c.bucket]]);
+      rows.push([r.branch,r.code||'',t,c.number||'',c.na?'Not applicable':(c.date?fmt(c.date):''),c.days===null?'':c.days,labels[c.bucket]]);
     });
   });
   download(rows.map(function(r){return r.map(function(v){
@@ -885,22 +864,56 @@ function readFile(f){
       if(!ok){alert('Could not load the Excel reader (no internet?). Save your file as CSV and upload that instead.');return;}
       fr.onload=function(e){
         var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
-        var ws=wb.Sheets[wb.SheetNames[0]];
-        ingest(XLSX.utils.sheet_to_json(ws,{defval:'',raw:false,dateNF:'yyyy-mm-dd'}), f.name);
+        var got=sheetToObjects(wb);
+        ingest(got.rows, f.name+' · '+got.sheet);
       };
       fr.readAsArrayBuffer(f);
     });
   }
 }
+function looksLikeHeaderRow(cells){
+  var joined=cells.map(function(c){return norm(c);}).join(' ');
+  return /(branch|outlet)/.test(joined) && /(expiry|expiration|valid|renew)/.test(joined);
+}
+function rowsToObjects(rows){
+  if(!rows.length) return [];
+  var hi=0;
+  for(var i=0;i<Math.min(rows.length,15);i++){
+    if(looksLikeHeaderRow(rows[i]||[])){ hi=i; break; }
+  }
+  var head=(rows[hi]||[]).map(function(c,i){
+    c=String(c==null?'':c).trim();
+    return c||('col'+i);
+  });
+  var out=[];
+  for(var r=hi+1;r<rows.length;r++){
+    var row=rows[r]||[], o={}, any=false;
+    for(var c=0;c<head.length;c++){
+      var v=row[c];
+      o[head[c]] = v==null? '' : v;
+      if(String(v==null?'':v).trim()!=='') any=true;
+    }
+    if(any) out.push(o);
+  }
+  return out;
+}
+function sheetToObjects(wb){
+  // pick the first sheet that actually looks like a licence register
+  for(var s=0;s<wb.SheetNames.length;s++){
+    var ws=wb.Sheets[wb.SheetNames[s]];
+    var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd',blankrows:false});
+    for(var i=0;i<Math.min(rows.length,15);i++){
+      if(looksLikeHeaderRow(rows[i]||[])) return {rows:rowsToObjects(rows), sheet:wb.SheetNames[s]};
+    }
+  }
+  var w0=wb.Sheets[wb.SheetNames[0]];
+  return {rows:rowsToObjects(XLSX.utils.sheet_to_json(w0,{header:1,defval:'',raw:false,blankrows:false})),
+          sheet:wb.SheetNames[0]};
+}
 function csvToObjects(text){
   var lines=text.replace(/\r/g,'').split('\n').filter(function(l){return l.trim()!=='';});
   if(!lines.length) return [];
-  var head=splitCsv(lines[0]);
-  return lines.slice(1).map(function(l){
-    var p=splitCsv(l), o={};
-    head.forEach(function(h,i){o[h.trim()]=p[i]===undefined?'':p[i].trim();});
-    return o;
-  });
+  return rowsToObjects(lines.map(splitCsv));
 }
 function splitCsv(line){
   var out=[],cur='',q=false;
@@ -1567,6 +1580,10 @@ function driveConnect(){
             DRIVE.copies.length+' license copies · '+DRIVE.data.length+' data file'+(DRIVE.data.length===1?'':'s');
     drvSay('good','connected',msg+'.');
     renderDriveData();
+    var reg=pickRegister(DRIVE.data);
+    if(reg && !ROWS.length) loadDriveRegister(reg,null);
+    else if(!reg && !ROWS.length)
+      drvSay('bad','no register','No spreadsheet found in the Drive folder. Put the licence tracker (.xlsx or .csv) into BEC LICENSES and press Refresh.','Nothing to load yet');
     try{ history.replaceState(null,'','#drive='+fid+'&key='+encodeURIComponent(key)); }catch(e){}
     if(ROWS.length) buildDriveLinks();
     else $('drvStatus').textContent=msg+'. Load a register below, or upload one, and the copies will link themselves.';
@@ -1579,9 +1596,17 @@ function driveConnect(){
     drvSay('bad','failed',msg);
   });
 }
-function drvSay(cls,badge,msg){
+function drvSay(cls,badge,msg,title){
   $('drvBadge').className='pill '+cls; $('drvBadge').textContent=badge;
   $('drvStatus').textContent=msg;
+  var boot=document.querySelector('.boot');
+  if(boot){
+    boot.className='boot'+(cls==='bad'?' err':(cls==='good'?' done':''));
+    $('bootTitle').textContent=title||(cls==='bad'?'Could not reach the Drive folder':'Connecting to Google Drive\u2026');
+    $('bootMsg').textContent=msg;
+    $('btnBootRetry').className=cls==='bad'?'btn':'btn hide';
+    if(cls==='bad') $('drivePanel').className='panel scan';
+  }
 }
 
 /* match the Drive copies against the loaded register */
@@ -1602,6 +1627,21 @@ function buildDriveLinks(){
 }
 
 /* the register itself can come from Drive */
+function pickRegister(list){
+  if(!list||!list.length) return null;
+  var best=null;
+  list.forEach(function(it){
+    var n=it.name.toLowerCase(), s=0;
+    if(/tracker/.test(n)) s+=6;
+    if(/regist/.test(n)) s+=5;
+    if(/licen/.test(n)) s+=3;
+    if(/expiry|expire/.test(n)) s+=2;
+    if(/\.xlsx?$/.test(n)) s+=1;
+    if(/\bcopy\b|backup|old|archive/.test(n)) s-=4;
+    if(!best || s>best.s) best={it:it,s:s};
+  });
+  return best.it;
+}
 function renderDriveData(){
   var box=$('drvFiles');
   if(!DRIVE.data.length){
@@ -1618,9 +1658,11 @@ function renderDriveData(){
   });
 }
 function loadDriveRegister(it,btn){
+  drvSay('maybe','loading\u2026','Reading '+it.name+'\u2026','Loading the licence register\u2026');
   var done=function(ok,note){
     if(btn){ btn.disabled=false; btn.textContent=ok?'Loaded':'Retry'; }
-    if(note) $('drvStatus').textContent=note;
+    if(ok) drvSay('good','connected',DRIVE.copies.length+' licence copies linked from Drive \u00b7 register: '+it.name+'.');
+    else if(note) drvSay('bad','failed',note);
   };
   if(it.mime===SHEET_MIME){
     var url='https://www.googleapis.com/drive/v3/files/'+it.id+'/export?mimeType=text%2Fcsv&key='+encodeURIComponent(DRIVE.key);
@@ -1640,8 +1682,8 @@ function loadDriveRegister(it,btn){
     fetch(driveBytesUrl(it)).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
       .then(function(buf){
         var wb=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
-        var ws=wb.Sheets[wb.SheetNames[0]];
-        ingest(XLSX.utils.sheet_to_json(ws,{defval:'',raw:false,dateNF:'yyyy-mm-dd'}), 'Drive · '+it.name);
+        var got=sheetToObjects(wb);
+        ingest(got.rows, 'Drive · '+it.name+' · '+got.sheet);
         done(true);
       })
       .catch(function(e){ done(false,'Could not read that workbook ('+e.message+').'); });
@@ -1669,26 +1711,16 @@ driveFromHash();
 /* connect as soon as the page opens, if both values are present */
 setTimeout(maybeAutoConnectDrive,0);
 /* ============ wiring ============ */
-$('btnPick').onclick=$('btnPick2').onclick=function(){$('file').click();};
-$('file').onchange=function(e){ if(e.target.files[0]) readFile(e.target.files[0]); };
-$('btnScan').onclick=function(){$('pdfFolder').click();};
-$('pdfFolder').onchange=function(e){ if(e.target.files.length) scanFiles(e.target.files); e.target.value=''; };
-$('btnApplyScan').onclick=applyScan;
-$('btnLink').onclick=function(){$('copyFolder').click();};
-$('btnDrive').onclick=function(){
-  $('drivePanel').className='panel scan';
-  $('drivePanel').scrollIntoView({behavior:'smooth',block:'start'});
-  if($('drvFolder').value.trim() && $('drvKey').value.trim()) driveConnect();
+$('btnRefresh').onclick=function(){ driveConnect(); };
+$('btnBootRetry').onclick=function(){ driveConnect(); };
+$('btnSettings').onclick=function(){
+  var el=$('drivePanel');
+  el.className = el.className.indexOf('hide')>=0 ? 'panel scan' : 'panel scan hide';
 };
 $('btnDrvConnect').onclick=driveConnect;
 $('btnDrvClose').onclick=function(){ $('drivePanel').className='panel scan hide'; };
-$('copyFolder').onchange=function(e){ if(e.target.files.length) linkCopies(e.target.files); e.target.value=''; };
 $('btnCopies').onclick=downloadCopies;
 $('btnCloseCopy').onclick=function(){ $('copyPanel').className='panel scan hide'; };
-$('btnExportScan').onclick=exportScan;
-$('btnCloseScan').onclick=function(){ $('scanPanel').className='panel scan hide'; SCAN=[]; };
-$('btnTemplate').onclick=templateCsv;
-$('btnSample').onclick=sampleData;
 $('btnPrint').onclick=function(){window.print();};
 $('btnExport').onclick=exportCsv;
 $('q').oninput=function(){FILTER.q=this.value;renderMatrix();};
@@ -1705,13 +1737,6 @@ document.querySelectorAll('.kpi').forEach(function(b){
     FILTER.month=null; $('fStatus').value=FILTER.status; renderAll();
   };
 });
-$('dfDay').onclick=function(){setDf(true);};
-$('dfMonth').onclick=function(){setDf(false);};
-function setDf(day){
-  DAY_FIRST=day;
-  $('dfDay').className=day?'on':''; $('dfMonth').className=day?'':'on';
-  if(RAW.length){buildRows();renderAll();}
-}
 /* keep the sticky table header parked exactly under the toolbar */
 function setStick(){
   var tb=document.querySelector('.topbar');
@@ -1726,14 +1751,6 @@ if(window.ResizeObserver){
   try{ new ResizeObserver(setStick).observe(document.querySelector('.topbar')); }catch(e){}
 }
 
-var drop=$('drop');
-['dragenter','dragover'].forEach(function(ev){
-  drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('hot');});
-});
-['dragleave','drop'].forEach(function(ev){
-  drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.remove('hot');});
-});
-drop.addEventListener('drop',function(e){ if(e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
 </script>
 </body>
 </html>
