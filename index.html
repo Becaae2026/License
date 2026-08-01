@@ -1293,15 +1293,28 @@ function tokenHit(bt,fts){
 function rawTokens(s){
   return String(s).toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(function(t){return t.length>1;});
 }
+function flat(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
 function matchToBranch(path){
-  var bare=path.replace(/\.[a-z0-9]+$/i,'').replace(/\//g,' ');
+  var full=path.replace(/\.[a-z0-9]+$/i,'');
+  var stem=full.split('/').pop();               // file name without folders
+  var bare=full.replace(/\//g,' ');
+  // 1. the file IS the branch code — "AB2.pdf", "HO-3.pdf", "T5A.pdf"
+  var fstem=flat(stem);
+  if(fstem){
+    for(var i=0;i<ROWS.length;i++){
+      var cf=flat(ROWS[i].code);
+      if(cf && cf===fstem) return {branch:ROWS[i].branch,score:2,exact:true};
+    }
+  }
   var fts=tokens(bare), rts=rawTokens(bare);
   if(!fts.length && !rts.length) return {branch:'',score:0,exact:false};
   var best={branch:'',score:0,exact:false};
-  // an exact branch-code hit wins outright
+  // 2. the code appears as a word inside the name — "AB2 Commercial.pdf"
+  var loose=' '+bare.toLowerCase().replace(/[^a-z0-9]+/g,' ')+' ';
   ROWS.forEach(function(r){
-    var code=String(r.code||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-    if(code.length>=2 && rts.indexOf(code)>=0 && best.score<1.3)
+    var code=flat(r.code);
+    if(code.length<2 || best.score>=1.3) return;
+    if(rts.indexOf(code)>=0 || loose.indexOf(' '+code+' ')>=0)
       best={branch:r.branch,score:1.3,exact:true};
   });
   ROWS.forEach(function(r){
