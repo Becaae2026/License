@@ -344,7 +344,7 @@ button{cursor:pointer}
 .up-drop.hot{border-color:var(--bec-lt);background:#f2f7ff}
 .up-drop.has{border-style:solid;border-color:var(--valid);background:#f2fbf7}
 .up-drop p{margin:0;color:var(--ink-2);font-size:13.5px}
-.up-target{margin-top:8px!important;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3)}
+.up-target{margin-top:8px!important;white-space:pre-line;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3)}
 .linkish{background:none;border:0;color:var(--bec-lt);text-decoration:underline;font-size:13.5px;padding:0}
 .up-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:16px 18px}
 .up-actions .spacer{flex:1}
@@ -462,7 +462,7 @@ button{cursor:pointer}
             <option value="Signboard">Signboard</option>
           </select>
         </label>
-        <label>New expiry date <span class="opt">(optional)</span>
+        <label>New expiry date <span class="opt">(optional — writes back to the tracker)</span>
           <input type="text" id="upExpiry" placeholder="dd/mm/yyyy">
         </label>
       </div>
@@ -549,7 +549,8 @@ button{cursor:pointer}
    ===================================================================== */
 var DRIVE_FOLDER  = '1Xv-LbyxLh62mjSgJboKa1ftu_R-gKpfo';   // BEC LICENSES folder
 var DRIVE_API_KEY = 'AIzaSyBWotg6wY3dg3r3jyYDI9yLBzppdh804S4';   // Drive API, restricted
-var DRIVE_CLIENT_ID = '';   // OAuth client ID — only needed to UPLOAD files back to Drive
+var DRIVE_CLIENT_ID = '792209084342-dou7e5pirfd5e0trgqn012j8q1dthmk9.apps.googleusercontent.com';   // OAuth — needed to upload files and update the tracker
+var DRIVE_SHEET_ID  = '1oQSsreJJMjavvyZACGxkzs5u02IYoCr-ulPXx5n3fHI';   // the tracker Google Sheet (used even if it sits outside the folder)
 /* ===================================================================== */
 
 /* ============ state ============ */
@@ -705,8 +706,13 @@ function ingest(rows, source){
   }
 
   if(!out.length){alert('No license rows could be read from that file.');return;}
-  var bad=out.filter(function(o){return o.raw!=null && o.raw!=='' && parseDate(o.raw)===null;}).length;
-  if(bad) warn.push(bad+' date value'+(bad>1?'s':'')+' could not be read — try the Day first / Month first switch, or check for text in the date column.');
+  var badv=out.filter(function(o){
+    return o.raw!=null && o.raw!=='' && !isNA(o.raw) && parseDate(o.raw)===null;
+  });
+  if(badv.length) warn.push(badv.length+' expiry value'+(badv.length>1?'s':'')+
+    ' could not be read as a date ('+badv.slice(0,4).map(function(o){
+      return o.branch+' '+o.type+': "'+String(o.raw).slice(0,18)+'"';}).join(', ')+
+    (badv.length>4?' …':'')+'). Fix them in the tracker.');
 
   RAW=out; SRC=source; TYPES=[];
   out.forEach(function(o){ if(TYPES.indexOf(o.type)<0) TYPES.push(o.type); });
@@ -1608,7 +1614,7 @@ function downloadCopies(){
 function copiesLinked(){ return Object.keys(FILES).length; }
 
 /* ============ google drive ============ */
-var DRIVE={folder:'',key:'',connected:false,copies:[],data:[],folderIds:{}};
+var DRIVE={folder:'',key:'',connected:false,copies:[],data:[],folderIds:{},sheetTitle:''};
 var DRIVE_FOLDER_MIME='application/vnd.google-apps.folder';
 var SHEET_MIME='application/vnd.google-apps.spreadsheet';
 
@@ -1670,10 +1676,19 @@ function driveConnect(){
     var msg=items.length+' item'+(items.length===1?'':'s')+' in Drive · '+
             DRIVE.copies.length+' license copies · '+DRIVE.data.length+' data file'+(DRIVE.data.length===1?'':'s');
     drvSay('good','connected',msg+'.');
-    $('upBadge').className = $('drvClient').value.trim()? 'pill maybe':'pill maybe';
-    $('upBadge').textContent = $('drvClient').value.trim()? 'sign-in required':'upload not configured';
+    if(UP.token && Date.now()<UP.expires-30000){
+      $('upBadge').className='pill good'; $('upBadge').textContent='signed in';
+    } else {
+      $('upBadge').className='pill maybe';
+      $('upBadge').textContent = $('drvClient').value.trim()? 'sign-in required':'upload not configured';
+    }
     renderDriveData();
     var reg=pickRegister(DRIVE.data);
+    if(DRIVE_SHEET_ID){
+      var inFolder=DRIVE.data.filter(function(d){return d.id===DRIVE_SHEET_ID;})[0];
+      reg = inFolder || {drive:true,id:DRIVE_SHEET_ID,name:'License tracker',
+                         mime:SHEET_MIME,path:'License tracker'};
+    }
     if(reg && !ROWS.length) loadDriveRegister(reg,null);
     else if(!reg && !ROWS.length)
       drvSay('bad','no register','No spreadsheet found in the Drive folder. Put the licence tracker (.xlsx or .csv) into BEC LICENSES and press Refresh.','Nothing to load yet');
@@ -1725,6 +1740,7 @@ function pickRegister(list){
   var best=null;
   list.forEach(function(it){
     var n=it.name.toLowerCase(), s=0;
+    if(it.mime===SHEET_MIME) s+=8;      // prefer the Sheet over a leftover .xlsx
     if(/tracker/.test(n)) s+=6;
     if(/regist/.test(n)) s+=5;
     if(/licen/.test(n)) s+=3;
@@ -1751,19 +1767,14 @@ function renderDriveData(){
   });
 }
 function loadDriveRegister(it,btn){
+  DRIVE.register=it;
   drvSay('maybe','loading\u2026','Reading '+it.name+'\u2026','Loading the licence register\u2026');
   var done=function(ok,note){
     if(btn){ btn.disabled=false; btn.textContent=ok?'Loaded':'Retry'; }
     if(ok) drvSay('good','connected',DRIVE.copies.length+' licence copies linked from Drive \u00b7 register: '+it.name+'.');
     else if(note) drvSay('bad','failed',note);
   };
-  if(it.mime===SHEET_MIME){
-    var url='https://www.googleapis.com/drive/v3/files/'+it.id+'/export?mimeType=text%2Fcsv&key='+encodeURIComponent(DRIVE.key);
-    fetch(url).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
-      .then(function(txt){ ingest(csvToObjects(txt), 'Drive · '+it.name); done(true); })
-      .catch(function(e){ done(false,'Could not read that Google Sheet ('+e.message+'). Try File → Download → CSV in Sheets and upload the file to the folder instead.'); });
-    return;
-  }
+  if(it.mime===SHEET_MIME){ loadSheet(it,done); return; }
   if(/\.csv$/i.test(it.name)){
     fetch(driveBytesUrl(it)).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
       .then(function(txt){ ingest(csvToObjects(txt), 'Drive · '+it.name); done(true); })
@@ -1781,6 +1792,42 @@ function loadDriveRegister(it,btn){
       })
       .catch(function(e){ done(false,'Could not read that workbook ('+e.message+').'); });
   });
+}
+
+/* Read a Google Sheet through the Sheets API rather than a CSV export.
+   Raw values come back as date serial numbers, so there is no dd/mm vs mm/dd
+   guessing, and we can pick the right tab by name instead of taking the first. */
+function loadSheet(it,done){
+  var key=encodeURIComponent(DRIVE.key);
+  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+it.id+'?fields=sheets.properties.title&key='+key)
+    .then(function(r){
+      return r.json().then(function(j){
+        if(!r.ok) throw new Error((j.error&&j.error.message)||('HTTP '+r.status));
+        return (j.sheets||[]).map(function(s){return s.properties.title;});
+      });
+    })
+    .then(function(titles){
+      if(!titles.length) throw new Error('That spreadsheet has no tabs.');
+      var pick=titles.filter(function(t){return /tracker|licen|register/i.test(t);})[0] || titles[0];
+      DRIVE.sheetTitle=pick; DRIVE.sheetTabs=titles;
+      return fetch('https://sheets.googleapis.com/v4/spreadsheets/'+it.id+'/values/'+
+                   encodeURIComponent(pick)+'?valueRenderOption=UNFORMATTED_VALUE&key='+key)
+        .then(function(r){
+          return r.json().then(function(j){
+            if(!r.ok) throw new Error((j.error&&j.error.message)||('HTTP '+r.status));
+            var rows=j.values||[];
+            if(!rows.length) throw new Error('The "'+pick+'" tab is empty.');
+            ingest(rowsToObjects(rows), 'Drive · '+it.name+' · '+pick);
+            done(true);
+          });
+        });
+    })
+    .catch(function(e){
+      var m=String(e.message||e);
+      if(/API has not been used|disabled/i.test(m))
+        m='The Google Sheets API is not enabled for this project — enable it in Google Cloud, then press Reload.';
+      done(false,'Could not read that Google Sheet: '+m);
+    });
 }
 
 function maybeAutoConnectDrive(){
@@ -1854,6 +1901,8 @@ function upTarget(){
   var msg='Saves as '+upName()+' in '+upFolderName();
   msg += existing? '  ·  replaces the copy already there' : '  ·  new file';
   if(!upCode()) msg+='  ·  no branch code on this row';
+  var d=parseDate($('upExpiry').value);
+  if(d) msg+='\n'+t+' expiry in the tracker will be set to '+fmt(d)+' (a dated backup is kept)';
   el.textContent=msg;
   btn.disabled = !UP.file;
 }
@@ -1890,7 +1939,7 @@ function upToken(cb){
     try{
       var tc=google.accounts.oauth2.initTokenClient({
         client_id:cid,
-        scope:'https://www.googleapis.com/auth/drive',
+        scope:'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets',
         callback:function(resp){
           if(resp && resp.access_token){
             UP.token=resp.access_token;
@@ -1930,11 +1979,20 @@ function doUpload(){
       if(ok){
         upSay('Saved '+name+' to '+upFolderName()+(existing?' (replaced the previous copy)':''),'ok');
         var d=parseDate($('upExpiry').value);
-        if(d) upSay('Note: the expiry date in the tracker is not changed by this upload — update '+
-                    dmy(d)+' in the spreadsheet as well.','er');
-        UP.token && setTimeout(function(){ driveConnect(); }, 800);
-        upSetFile(null); $('upFile').value='';
+        if(d){
+          upSay('Updating the tracker …');
+          trackerUpdate(b,t,d,tok,function(ok2,msg){
+            upSay(ok2? 'Tracker updated · '+msg : 'Tracker NOT updated: '+msg, ok2?'ok':'er');
+            if(ok2 && TRACKER_WARN) upSay('Note: '+TRACKER_WARN,'er');
+            if(!ok2) upSay('The PDF was replaced, but the expiry date still needs changing in the spreadsheet.','er');
+            finish();
+          });
+        } else finish();
       } else upSay('Upload failed: '+detail,'er');
+      function finish(){
+        setTimeout(function(){ driveConnect(); }, 800);
+        upSetFile(null); $('upFile').value=''; $('upExpiry').value='';
+      }
     };
 
     if(existing && existing.drive){
@@ -1965,6 +2023,151 @@ function downloadRenamed(){
   upSay('Saved '+upName()+' to your downloads — drop it into the '+upFolderName()+' folder in Drive.','ok');
 }
 
+
+/* ============ write the new expiry back into the tracker ============ */
+var TRACKER_WARN='';
+var EXP_COL={
+  Commercial:/commercial.*(expiry|expire|valid)/i,
+  Fire:/fire.*(expiry|expire|valid)/i,
+  Signboard:/(signboard|sign board).*(expiry|expire|valid)/i
+};
+
+function trackerUpdate(branch,type,date,tok,cb){
+  var reg=DRIVE.register;
+  if(!reg){ cb(false,'No tracker file is loaded.'); return; }
+  TRACKER_WARN='';
+  if(reg.mime===SHEET_MIME){ sheetsUpdate(reg,branch,type,date,tok,cb); return; }
+  var row=ROWS.filter(function(r){return r.branch===branch;})[0];
+  var code=row? String(row.code||'') : '';
+
+  ensureXlsx(function(ok){
+    if(!ok){ cb(false,'Could not load the spreadsheet library.'); return; }
+    fetch(driveBytesUrl(reg))
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
+      .then(function(buf){
+        var wb=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true,cellStyles:true,cellNF:true});
+        var res=setExpiry(wb,branch,code,type,date);
+        if(!res.ok) throw new Error(res.msg);
+        TRACKER_WARN=res.warn||'';
+        var out=XLSX.write(wb,{bookType:'xlsx',type:'array',cellDates:true,cellStyles:true});
+        // keep a dated backup before overwriting the original
+        return backupThen(reg,tok).then(function(){
+          return fetch('https://www.googleapis.com/upload/drive/v3/files/'+reg.id+'?uploadType=media',
+            {method:'PATCH',
+             headers:{'Authorization':'Bearer '+tok,
+                      'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},
+             body:new Blob([out])});
+        }).then(function(r){
+          if(!r.ok) return r.text().then(function(x){ throw new Error(x.slice(0,140)); });
+          cb(true,res.msg);
+        });
+      })
+      .catch(function(e){ cb(false,e.message); });
+  });
+}
+
+/* a Google Sheet can be edited one cell at a time — nothing else is rewritten */
+function sheetsUpdate(reg,branch,type,date,tok,cb){
+  var row=ROWS.filter(function(r){return r.branch===branch;})[0];
+  var code=row? String(row.code||'') : '';
+  var re=EXP_COL[type];
+  var tab=DRIVE.sheetTitle||'';
+  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+reg.id+'/values/'+encodeURIComponent(tab)+
+        '?valueRenderOption=UNFORMATTED_VALUE&key='+encodeURIComponent(DRIVE.key))
+    .then(function(r){ return r.json().then(function(j){
+        if(!r.ok) throw new Error((j.error&&j.error.message)||('HTTP '+r.status));
+        return j.values||[];
+      }); })
+    .then(function(rows){
+      var hdr=-1, expC=-1, codeC=-1, nameC=-1;
+      for(var i=0;i<Math.min(rows.length,15);i++){
+        var e=-1,cc=-1,nc=-1;
+        rows[i].forEach(function(v,c){
+          if(/branch\s*code/i.test(v)) cc=c;
+          else if(/branch\s*name|branchname/i.test(v)) nc=c;
+          if(re.test(v) && e<0) e=c;
+        });
+        if(e>=0 && (cc>=0||nc>=0)){ hdr=i; expC=e; codeC=cc; nameC=nc; break; }
+      }
+      if(hdr<0) throw new Error('Could not find the '+type+' expiry column.');
+      var target=-1;
+      for(var r2=hdr+1;r2<rows.length;r2++){
+        var cv=codeC>=0? String(rows[r2][codeC]||'').trim():'';
+        var nv=nameC>=0? String(rows[r2][nameC]||'').trim():'';
+        if((code && cv.toUpperCase()===code.toUpperCase()) ||
+           (!code && nv.toUpperCase()===String(branch).toUpperCase())){ target=r2; break; }
+      }
+      if(target<0) throw new Error('Could not find '+(code||branch)+' in the tracker.');
+      var a1=(tab? "'"+tab.replace(/'/g,"''")+"'!" : '')+colLetter(expC)+(target+1);
+      return fetch('https://sheets.googleapis.com/v4/spreadsheets/'+reg.id+'/values/'+
+                   encodeURIComponent(a1)+'?valueInputOption=USER_ENTERED',
+        {method:'PUT',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+         body:JSON.stringify({values:[[dmy(date)]]})})
+        .then(function(r){
+          if(!r.ok) return r.text().then(function(x){ throw new Error(x.slice(0,140)); });
+          cb(true,a1+' set to '+fmt(date)+' — nothing else in the sheet was touched');
+        });
+    })
+    .catch(function(e){ cb(false,e.message); });
+}
+function colLetter(n){
+  var s='';
+  do { s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26)-1; } while(n>=0);
+  return s;
+}
+
+function backupThen(reg,tok){
+  var stamp=new Date().toISOString().slice(0,10);
+  var nm=reg.name.replace(/\.xlsx?$/i,'')+' — backup '+stamp+'.xlsx';
+  return fetch('https://www.googleapis.com/drive/v3/files/'+reg.id+'/copy',
+    {method:'POST',
+     headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+     body:JSON.stringify({name:nm,parents:[DRIVE.folder]})})
+    .then(function(){ return true; })
+    .catch(function(){ return true; });   // a failed backup must not block the update
+}
+
+function setExpiry(wb,branch,code,type,date){
+  var re=EXP_COL[type];
+  if(!re) return {ok:false,msg:'Unknown licence category.'};
+  for(var s=0;s<wb.SheetNames.length;s++){
+    var ws=wb.Sheets[wb.SheetNames[s]];
+    if(!ws || !ws['!ref']) continue;
+    var rng=XLSX.utils.decode_range(ws['!ref']);
+    // find the header row
+    for(var R=rng.s.r; R<=Math.min(rng.s.r+14,rng.e.r); R++){
+      var cols={}, hasBranch=false, expCol=-1, codeCol=-1, nameCol=-1;
+      for(var C=rng.s.c; C<=rng.e.c; C++){
+        var cell=ws[XLSX.utils.encode_cell({r:R,c:C})];
+        var v=cell? String(cell.v||'') : '';
+        if(!v) continue;
+        if(/branch\s*code/i.test(v)) { codeCol=C; hasBranch=true; }
+        else if(/branch\s*name|branchname/i.test(v)) { nameCol=C; hasBranch=true; }
+        if(re.test(v) && expCol<0) expCol=C;
+      }
+      if(!hasBranch || expCol<0) continue;
+      // find the branch row underneath
+      for(var r2=R+1; r2<=rng.e.r; r2++){
+        var cc=codeCol>=0? ws[XLSX.utils.encode_cell({r:r2,c:codeCol})] : null;
+        var nc=nameCol>=0? ws[XLSX.utils.encode_cell({r:r2,c:nameCol})] : null;
+        var cv=cc? String(cc.v||'').trim() : '';
+        var nv=nc? String(nc.v||'').trim() : '';
+        var hit=(code && cv && cv.toUpperCase()===code.toUpperCase()) ||
+                (!code && nv && nv.toUpperCase()===String(branch).toUpperCase());
+        if(!hit) continue;
+        var addr=XLSX.utils.encode_cell({r:r2,c:expCol});
+        var prev=ws[addr] && ws[addr].v;
+        ws[addr]={t:'d',v:date,z:(ws[addr]&&ws[addr].z)||'dd-mmm-yy'};
+        var was=(prev instanceof Date)? fmt(prev) : String(prev==null?'(blank)':prev);
+        return {ok:true,msg:'tracker row '+(r2+1)+' updated · '+type+' expiry '+was+' → '+fmt(date),
+                warn:'the .xlsx was rewritten, so cell colours and conditional formatting are lost — a dated backup was saved in Drive'};
+      }
+      return {ok:false,msg:'Could not find '+(code||branch)+' in the tracker.'};
+    }
+  }
+  return {ok:false,msg:'Could not find the '+type+' expiry column in the tracker.'};
+}
+
 /* ============ wiring ============ */
 $('btnRefresh').onclick=function(){
   var t=$('btnRefresh'); t.className='tile busy';
@@ -1980,6 +2183,7 @@ $('btnDrvEdit').onclick=function(){
 };
 $('upBranch').onchange=upTarget;
 $('upType').onchange=upTarget;
+$('upExpiry').oninput=upTarget;
 $('upPick').onclick=function(){ $('upFile').click(); };
 $('upFile').onchange=function(e){ if(e.target.files[0]) upSetFile(e.target.files[0]); };
 $('btnUpload').onclick=doUpload;
