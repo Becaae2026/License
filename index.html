@@ -446,7 +446,7 @@ button{cursor:pointer}
       <div class="panel-head">
         <div>
           <h2>Upload a new licence copy</h2>
-          <span class="sub">Choose the branch and category. The file is renamed to the branch code and replaces the copy in Drive.</span>
+          <span class="sub">Renames the file to the branch code, replaces the copy in Drive, and updates the expiry date in the tracker.</span>
         </div>
         <span id="upBadge" class="pill maybe">sign-in required</span>
       </div>
@@ -462,7 +462,7 @@ button{cursor:pointer}
             <option value="Signboard">Signboard</option>
           </select>
         </label>
-        <label>New expiry date <span class="opt">(optional — writes back to the tracker)</span>
+        <label>New expiry date <span class="opt">(optional)</span>
           <input type="text" id="upExpiry" placeholder="dd/mm/yyyy">
         </label>
       </div>
@@ -1858,12 +1858,18 @@ function showTab(name){
   });
   $('app').className = name==='dash' ? '' : 'hide';
   $('uploadTab').className = name==='upload' ? '' : 'hide';
-  if(name==='upload') fillUploadBranches();
+  if(name==='upload'){ fillUploadBranches(); upBadge(); }
 }
 
 /* ============ upload ============ */
 var UP={file:null,token:null,expires:0};
 
+function upBadge(){
+  var el=$('upBadge');
+  if(UP.token && Date.now()<UP.expires-30000){ el.className='pill good'; el.textContent='signed in'; return; }
+  if(!$('drvClient').value.trim()){ el.className='pill bad'; el.textContent='upload not configured'; return; }
+  el.className='pill maybe'; el.textContent='sign-in required';
+}
 function fillUploadBranches(){
   var sel=$('upBranch'), cur=sel.value;
   sel.innerHTML='<option value="">— choose branch —</option>';
@@ -1898,12 +1904,22 @@ function upTarget(){
   var el=$('upTarget'), btn=$('btnUpload');
   if(!b){ el.textContent=''; btn.disabled=true; return; }
   var existing=FILES[copyKey(b,t)];
-  var msg='Saves as '+upName()+' in '+upFolderName();
-  msg += existing? '  ·  replaces the copy already there' : '  ·  new file';
-  if(!upCode()) msg+='  ·  no branch code on this row';
+  var lines=[];
+  lines.push('File: saves as '+upName()+' in '+upFolderName()+
+             (existing? '  ·  replaces the copy already there' : '  ·  new file'));
+  if(!upCode()) lines.push('This branch has no code in the tracker — the file will use its name instead.');
+
+  var row=ROWS.filter(function(x){return x.branch===b;})[0];
+  var cell=row && row.cells[t];
+  var cur = !cell ? 'not in the tracker'
+          : cell.na ? 'Not Applicable'
+          : cell.date ? fmt(cell.date)+' ('+tagText(cell.days)+')'
+          : 'no date';
   var d=parseDate($('upExpiry').value);
-  if(d) msg+='\n'+t+' expiry in the tracker will be set to '+fmt(d)+' (a dated backup is kept)';
-  el.textContent=msg;
+  if(d) lines.push('Tracker: '+t+' expiry '+cur+'  →  '+fmt(d)+
+                   (DRIVE.sheetTitle? '  ·  only that one cell in "'+DRIVE.sheetTitle+'" changes' : ''));
+  else lines.push('Tracker: '+t+' expiry stays '+cur+' — fill in the date above to change it');
+  el.textContent=lines.join('\n');
   btn.disabled = !UP.file;
 }
 function upSetFile(f){
