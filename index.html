@@ -373,6 +373,31 @@ button{cursor:pointer}
   letter-spacing:0;text-transform:none;font-family:"IBM Plex Sans",sans-serif;font-weight:400}
 .br-na input{width:15px;height:15px}
 @media(max-width:900px){.br-grid{grid-template-columns:1fr}}
+.panel.danger{border-color:#f2c7c4;margin-top:16px}
+.panel.danger .panel-head{background:linear-gradient(90deg,#fff5f5,#fffafa)}
+.panel.danger .panel-head h2{color:var(--expired)}
+.danger-btn{background:var(--expired);border-color:var(--expired);color:#fff}
+.danger-btn:hover{background:#b91c1c;border-color:#b91c1c}
+.danger-btn:disabled{opacity:.45;cursor:default}
+.del-summary{padding:0 18px 4px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;
+  color:var(--ink-2);white-space:pre-line}
+.modal-back{position:fixed;inset:0;background:rgba(16,24,44,.55);z-index:100;
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:16px;max-width:520px;width:100%;padding:24px 26px;
+  box-shadow:0 18px 50px rgba(16,24,44,.35)}
+.modal h2{font-family:"Archivo",sans-serif;font-size:19px;margin:0 0 12px;color:var(--expired)}
+.cf-body{font-size:13.5px;color:var(--ink-2);border:1px solid var(--rule-soft);border-radius:10px;
+  padding:12px 14px;background:#fbfcff;white-space:pre-line;font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+.cf-check{display:flex;gap:9px;align-items:flex-start;margin-top:14px;font-size:13px;color:var(--ink-2)}
+.cf-check input{margin-top:2px;width:15px;height:15px;flex:none}
+.cf-type{display:flex;flex-direction:column;gap:6px;margin-top:14px;font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--bec);
+  font-family:"IBM Plex Mono",monospace;font-weight:600}
+.cf-type input{border:1px solid var(--rule);border-radius:8px;padding:9px 12px;font-size:14px;
+  letter-spacing:0;text-transform:none;font-family:"IBM Plex Mono",monospace}
+.cf-type input:focus{outline:2px solid var(--expired);outline-offset:-1px}
+.cf-warn{margin-top:12px;font-size:12.5px;color:var(--expired)}
+.cf-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 .hide{display:none!important}
 
 @media(max-width:900px){
@@ -457,7 +482,7 @@ button{cursor:pointer}
   <div class="tabs hide" id="tabs">
     <button class="tab on" data-tab="dash">Dashboard</button>
     <button class="tab" data-tab="upload">Upload licence</button>
-    <button class="tab" data-tab="branch">Add branch</button>
+    <button class="tab" data-tab="branch">Manage branches</button>
   </div>
 
   <section id="uploadTab" class="hide">
@@ -530,7 +555,44 @@ button{cursor:pointer}
       </div>
       <div class="up-log hide" id="brLog"></div>
     </div>
+    <div class="panel danger">
+      <div class="panel-head">
+        <div>
+          <h2>Remove a branch</h2>
+          <span class="sub">Deletes the branch row from the tracker. Licence copies can be sent to the Drive bin at the same time.</span>
+        </div>
+      </div>
+      <div class="up-form">
+        <label>Branch to remove
+          <select id="delBranch"><option value="">&mdash; choose branch &mdash;</option></select>
+        </label>
+      </div>
+      <div class="del-summary" id="delSummary"></div>
+      <div class="up-actions">
+        <button class="btn danger-btn" id="btnDelBranch" disabled>Remove branch&hellip;</button>
+        <span class="spacer"></span>
+        <span class="sub">You will be asked to confirm before anything is removed.</span>
+      </div>
+      <div class="up-log hide" id="delLog"></div>
+    </div>
   </section>
+
+  <div class="modal-back hide" id="confirmBack">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cfTitle">
+      <h2 id="cfTitle">Remove this branch?</h2>
+      <div class="cf-body" id="cfBody"></div>
+      <label class="cf-check"><input type="checkbox" id="cfFiles" checked>
+        Also move the licence copies to the Drive bin (recoverable for 30 days)</label>
+      <label class="cf-type">Type the branch code to confirm
+        <input type="text" id="cfType" autocomplete="off" placeholder="branch code">
+      </label>
+      <div class="cf-warn">Removing the tracker row cannot be undone from here.</div>
+      <div class="cf-actions">
+        <button class="btn ghost" id="cfCancel">Cancel</button>
+        <button class="btn danger-btn" id="cfGo" disabled>Remove branch</button>
+      </div>
+    </div>
+  </div>
 
   <main id="app" class="hide">
     <div id="parseWarn" class="warn hide"></div>
@@ -1663,7 +1725,7 @@ function downloadCopies(){
 function copiesLinked(){ return Object.keys(FILES).length; }
 
 /* ============ google drive ============ */
-var DRIVE={folder:'',key:'',connected:false,copies:[],data:[],folderIds:{},sheetTitle:''};
+var DRIVE={folder:'',key:'',connected:false,copies:[],data:[],folderIds:{},sheetTitle:'',sheetIds:{}};
 var DRIVE_FOLDER_MIME='application/vnd.google-apps.folder';
 var SHEET_MIME='application/vnd.google-apps.spreadsheet';
 
@@ -1848,10 +1910,12 @@ function loadDriveRegister(it,btn){
    guessing, and we can pick the right tab by name instead of taking the first. */
 function loadSheet(it,done){
   var key=encodeURIComponent(DRIVE.key);
-  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+it.id+'?fields=sheets.properties.title&key='+key)
+  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+it.id+'?fields=sheets.properties&key='+key)
     .then(function(r){
       return r.json().then(function(j){
         if(!r.ok) throw new Error((j.error&&j.error.message)||('HTTP '+r.status));
+        DRIVE.sheetIds={};
+        (j.sheets||[]).forEach(function(s){ DRIVE.sheetIds[s.properties.title]=s.properties.sheetId; });
         return (j.sheets||[]).map(function(s){return s.properties.title;});
       });
     })
@@ -1909,7 +1973,7 @@ function showTab(name){
   $('uploadTab').className = name==='upload' ? '' : 'hide';
   $('branchTab').className = name==='branch' ? '' : 'hide';
   if(name==='upload'){ fillUploadBranches(); upBadge(); }
-  if(name==='branch'){ buildBranchGrid(); brBadge(); }
+  if(name==='branch'){ buildBranchGrid(); brBadge(); fillDeleteBranches(); }
 }
 
 /* ============ upload ============ */
@@ -2414,6 +2478,152 @@ function resetBranchForm(){
   });
 }
 
+
+/* ============ remove a branch ============ */
+var DEL={branch:null};
+
+function fillDeleteBranches(){
+  var sel=$('delBranch'), cur=sel.value;
+  sel.innerHTML='<option value="">— choose branch —</option>';
+  ROWS.slice().sort(function(a,b){return a.branch.localeCompare(b.branch);})
+    .forEach(function(r){
+      var o=document.createElement('option');
+      o.value=r.branch; o.textContent=(r.code? r.code+' — ':'')+r.branch;
+      sel.appendChild(o);
+    });
+  sel.value=cur; delSummary();
+}
+function delDetail(b){
+  var row=ROWS.filter(function(x){return x.branch===b;})[0];
+  if(!row) return null;
+  var lines=[], files=[];
+  BR_CATS.forEach(function(c){
+    var cell=row.cells[c];
+    var when = !cell? 'not in tracker' : cell.na? 'Not Applicable'
+             : cell.date? fmt(cell.date) : 'no date';
+    var f=FILES[copyKey(b,c)];
+    if(f && f.drive) files.push({cat:c,file:f});
+    lines.push('  '+c.padEnd(11)+' '+when+(f? '   · copy: '+f.name : '   · no copy linked'));
+  });
+  return {row:row, lines:lines, files:files};
+}
+function delSummary(){
+  var b=$('delBranch').value, el=$('delSummary'), btn=$('btnDelBranch');
+  if(!b){ el.textContent=''; btn.disabled=true; return; }
+  var d=delDetail(b); if(!d){ el.textContent=''; btn.disabled=true; return; }
+  el.textContent='Will remove the tracker row for '+(d.row.code? d.row.code+' — ':'')+d.row.branch+'\n'+
+                 d.lines.join('\n');
+  btn.disabled=false;
+}
+function delSay(msg,cls){
+  var box=$('delLog'); box.className='up-log';
+  var d=document.createElement('div'); if(cls) d.className=cls;
+  d.textContent=msg; box.appendChild(d);
+}
+
+function openConfirm(){
+  var b=$('delBranch').value; if(!b) return;
+  var d=delDetail(b); if(!d) return;
+  DEL.branch=b; DEL.detail=d;
+  var code=d.row.code||d.row.branch;
+  $('cfBody').textContent=(d.row.code? d.row.code+' — ':'')+d.row.branch+'\n'+d.lines.join('\n')+
+    '\n\n'+d.files.length+' licence '+(d.files.length===1?'copy':'copies')+' linked in Drive';
+  $('cfFiles').checked = d.files.length>0;
+  $('cfFiles').disabled = d.files.length===0;
+  $('cfType').value=''; $('cfType').placeholder=code;
+  $('cfGo').disabled=true;
+  $('confirmBack').className='modal-back';
+  setTimeout(function(){ $('cfType').focus(); },50);
+}
+function closeConfirm(){ $('confirmBack').className='modal-back hide'; }
+
+function runDelete(){
+  var d=DEL.detail, b=DEL.branch;
+  var alsoFiles=$('cfFiles').checked;
+  closeConfirm();
+  upToken(function(tok,err){
+    if(!tok){
+      delSay(err==='no-client'? 'Removing a branch writes to the tracker, which needs sign-in.' : err,'er');
+      return;
+    }
+    $('btnDelBranch').disabled=true;
+    delSay('Removing '+(d.row.code||b)+' …');
+    sheetDeleteRow(d.row, tok, function(ok,msg){
+      if(!ok){ delSay('Tracker not changed: '+msg,'er'); $('btnDelBranch').disabled=false; return; }
+      delSay('Tracker: '+msg,'ok');
+      if(!alsoFiles || !d.files.length){
+        if(d.files.length) delSay('Licence copies left in Drive.');
+        finishDelete();
+        return;
+      }
+      var left=d.files.length;
+      d.files.forEach(function(f){
+        fetch('https://www.googleapis.com/drive/v3/files/'+f.file.id+'?supportsAllDrives=true',
+          {method:'PATCH',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+           body:JSON.stringify({trashed:true})})
+          .then(function(r){ if(!r.ok) return r.text().then(function(x){throw new Error(x.slice(0,110));});
+                             delSay('Moved '+f.file.name+' ('+f.cat+') to the Drive bin','ok'); })
+          .catch(function(e){ delSay('Could not bin '+f.file.name+': '+e.message,'er'); })
+          .then(function(){ if(--left===0) finishDelete(); });
+      });
+    });
+  });
+  function finishDelete(){
+    delSay('Reloading from Drive …','ok');
+    $('btnDelBranch').disabled=false;
+    setTimeout(function(){ driveConnect(); }, 900);
+  }
+}
+
+function sheetDeleteRow(row,tok,cb){
+  var reg=DRIVE.register;
+  if(!reg || reg.mime!==SHEET_MIME){
+    cb(false,'the tracker must be a Google Sheet for this'); return;
+  }
+  var tab=DRIVE.sheetTitle||'';
+  var gid=DRIVE.sheetIds? DRIVE.sheetIds[tab] : undefined;
+  if(gid===undefined){ cb(false,'could not identify the "'+tab+'" tab'); return; }
+  var code=String(row.code||'');
+  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+reg.id+'/values/'+encodeURIComponent(tab)+
+        '?valueRenderOption=UNFORMATTED_VALUE&key='+encodeURIComponent(DRIVE.key))
+    .then(function(r){ return r.json().then(function(j){
+        if(!r.ok) throw new Error((j.error&&j.error.message)||('HTTP '+r.status));
+        return j.values||[];
+      }); })
+    .then(function(rows){
+      var hdr=-1,codeC=-1,nameC=-1;
+      for(var i=0;i<Math.min(rows.length,15);i++){
+        var cc=-1,nc=-1,seen=false;
+        (rows[i]||[]).forEach(function(v,c){
+          v=String(v||'');
+          if(/branch\s*code/i.test(v)) cc=c;
+          else if(/branch\s*name|branchname/i.test(v)) nc=c;
+          if(EXP_COL.Commercial.test(v)) seen=true;
+        });
+        if(seen && (cc>=0||nc>=0)){ hdr=i; codeC=cc; nameC=nc; break; }
+      }
+      if(hdr<0) throw new Error('could not read the tracker headings');
+      var target=-1, hits=0;
+      for(var r2=hdr+1;r2<rows.length;r2++){
+        var cv=codeC>=0? String(rows[r2][codeC]||'').trim():'';
+        var nv=nameC>=0? String(rows[r2][nameC]||'').trim():'';
+        if((code && cv.toUpperCase()===code.toUpperCase()) ||
+           (!code && nv.toUpperCase()===row.branch.toUpperCase())){ if(target<0) target=r2; hits++; }
+      }
+      if(target<0) throw new Error('could not find '+(code||row.branch)+' in the tracker');
+      if(hits>1) throw new Error((code||row.branch)+' appears '+hits+' times in the tracker — tidy it up first so the right row is removed');
+      return fetch('https://sheets.googleapis.com/v4/spreadsheets/'+reg.id+':batchUpdate',
+        {method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+         body:JSON.stringify({requests:[{deleteDimension:{range:{
+            sheetId:gid, dimension:'ROWS', startIndex:target, endIndex:target+1 }}}]})})
+        .then(function(r){
+          if(!r.ok) return r.text().then(function(x){ throw new Error(x.slice(0,140)); });
+          cb(true,'row '+(target+1)+' deleted from "'+tab+'"');
+        });
+    })
+    .catch(function(e){ cb(false,e.message); });
+}
+
 /* ============ wiring ============ */
 $('btnRefresh').onclick=function(){
   var t=$('btnRefresh'); t.className='tile busy';
@@ -2435,6 +2645,18 @@ $('upFile').onchange=function(e){ if(e.target.files[0]) upSetFile(e.target.files
 $('btnUpload').onclick=doUpload;
 $('btnUpDownload').onclick=downloadRenamed;
 $('btnAddBranch').onclick=addBranch;
+$('delBranch').onchange=delSummary;
+$('btnDelBranch').onclick=openConfirm;
+$('cfCancel').onclick=closeConfirm;
+$('cfGo').onclick=runDelete;
+$('cfType').oninput=function(){
+  var want=(DEL.detail && (DEL.detail.row.code||DEL.detail.row.branch))||'';
+  $('cfGo').disabled = this.value.trim().toUpperCase()!==want.toUpperCase();
+};
+$('confirmBack').onclick=function(e){ if(e.target===this) closeConfirm(); };
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape' && $('confirmBack').className.indexOf('hide')<0) closeConfirm();
+});
 (function(){
   var d=$('upDrop');
   ['dragenter','dragover'].forEach(function(ev){
