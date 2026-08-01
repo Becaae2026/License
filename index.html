@@ -435,25 +435,6 @@ button{cursor:pointer}
     <div class="drive-files hide" id="drvFiles"></div>
   </section>
 
-  <section class="panel scan hide" id="copyPanel">
-    <div class="scan-head">
-      <div>
-        <h2>License copies</h2>
-        <span class="sub">Branch and type are read from the file name. Check the matches below and change any that are wrong.</span>
-      </div>
-      <div class="legend"><span id="copyCount" class="pill good"></span></div>
-    </div>
-    <div class="scan-status" id="copyStatus"></div>
-    <div style="overflow-x:auto"><table class="mini" id="copyTable"><thead><tr>
-      <th>File name</th><th>Branch</th><th>License type</th><th>Match</th><th>Open</th>
-    </tr></thead><tbody id="copyBody"></tbody></table></div>
-    <div class="copies-note">Copies stay linked while this tab is open. Re-link the folder after a refresh &mdash; one click, nothing is lost.</div>
-    <div class="scan-actions">
-      <button class="btn" id="btnCloseCopy">Close</button>
-      <span class="spacer"></span>
-      <span class="sub" id="copyHint"></span>
-    </div>
-  </section>
 
   <div class="tabs hide" id="tabs">
     <button class="tab on" data-tab="dash">Dashboard</button>
@@ -504,6 +485,7 @@ button{cursor:pointer}
 
   <main id="app" class="hide">
     <div id="parseWarn" class="warn hide"></div>
+    <div id="copyWarn" class="warn hide"></div>
 
     <div class="kpis">
       <button class="kpi k-expired" data-bucket="expired"><span class="n" id="nExpired">0</span><span class="l">Expired</span></button>
@@ -934,6 +916,17 @@ function renderMatrix(){
   $('footCount').textContent=list.length+' of '+ROWS.length+' branches · '+shown+' of '+RAW.length+
     ' licenses shown'+(nc? ' · '+nc+' copies linked':'');
   $('footSrc').textContent=SRC+' · checked '+fmt(TODAY);
+  var wf=$('copyWarn');
+  if(wf){
+    if(COPY_UNMATCHED.length){
+      wf.className='warn';
+      wf.textContent=COPY_UNMATCHED.length+' licence file'+(COPY_UNMATCHED.length>1?'s in Drive could':' in Drive could')+
+        ' not be matched to a branch with certainty, so '+(COPY_UNMATCHED.length>1?'they are':'it is')+
+        ' not linked: '+COPY_UNMATCHED.slice(0,6).map(function(l){return l.path.split('/').pop();}).join(', ')+
+        (COPY_UNMATCHED.length>6?' and '+(COPY_UNMATCHED.length-6)+' more':'')+
+        '. Rename them to the branch code (e.g. AB2.pdf) in Drive.';
+    } else wf.className='warn hide';
+  }
   var any=FILTER.q||FILTER.type||FILTER.status||FILTER.month;
   $('clearFilters').className=any?'chip-clear':'chip-clear hide';
 }
@@ -1494,70 +1487,21 @@ function linkCopies(fileList){
 
 function rebuildLinks(){
   FILES={};
-  LINKS.forEach(function(l){ if(l.branch && l.type) FILES[copyKey(l.branch,l.type)]=l.file; });
+  // only link files we are sure about — a guessed match can attach the wrong
+  // certificate to a branch, which is worse than showing no copy at all
+  LINKS.forEach(function(l){
+    if(l.branch && l.type && l.conf==='good') FILES[copyKey(l.branch,l.type)]=l.file;
+  });
 }
 
 function showCopyPanel(total){
-  $('copyPanel').className='panel scan';
   var need=LINKS.filter(function(l){return l.conf!=='good';}).length;
-  $('copyCount').textContent=Object.keys(FILES).length+' linked';
-  $('copyStatus').textContent=total+' file'+(total===1?'':'s')+' read from the folder · '+
-    (total-need)+' matched on the file name'+(need? ' · '+need+' to check':'')+'.';
-  $('copyHint').textContent=need? 'Rows are sorted worst-first — fix the top ones.' : 'Every file matched a branch.';
-  renderCopyTable();
-  $('copyPanel').scrollIntoView({behavior:'smooth',block:'start'});
-}
-
-function renderCopyTable(){
-  var body=$('copyBody'); body.innerHTML='';
-  if(!LINKS.length){
-    body.innerHTML='<tr><td colspan="5" style="padding:22px;text-align:center;color:var(--ink-3)">No files linked yet.</td></tr>';
-    return;
-  }
-  var types=TYPES.length?TYPES:['Commercial','Fire','Signboard'];
-  LINKS.forEach(function(l,idx){
-    var tr=document.createElement('tr');
-    if(l.conf==='bad') tr.className='bad';
-    tr.innerHTML='<td><span class="fname" title="'+esc(l.path)+'">'+esc(l.path)+'</span></td>';
-
-    var tdB=document.createElement('td');
-    var sb=document.createElement('select');
-    sb.innerHTML='<option value="">— choose branch —</option>'+ROWS.map(function(r){
-      return '<option'+(r.branch===l.branch?' selected':'')+'>'+esc(r.branch)+'</option>';}).join('');
-    sb.onchange=function(){ LINKS[idx].branch=this.value; touched(idx,tr); };
-    tdB.appendChild(sb); tr.appendChild(tdB);
-
-    var tdT=document.createElement('td');
-    var st=document.createElement('select');
-    st.innerHTML='<option value="">— choose type —</option>'+types.map(function(t){
-      return '<option'+(t===l.type?' selected':'')+'>'+esc(t)+'</option>';}).join('');
-    st.onchange=function(){ LINKS[idx].type=this.value; touched(idx,tr); };
-    tdT.appendChild(st); tr.appendChild(tdT);
-
-    var tdC=document.createElement('td');
-    tdC.innerHTML='<span class="pill '+l.conf+'">'+
-      (l.conf==='good'?'exact':l.conf==='maybe'?'close match':'no match')+'</span>';
-    tr.appendChild(tdC);
-
-    var tdO=document.createElement('td');
-    var a=document.createElement('button');
-    a.className='btn'; a.style.padding='4px 10px'; a.textContent='View';
-    a.onclick=function(){ openFile(l.file); };
-    tdO.appendChild(a); tr.appendChild(tdO);
-
-    body.appendChild(tr);
-  });
-}
-function touched(idx,tr){
-  var l=LINKS[idx];
-  l.conf = (l.branch && l.type)? 'good':'bad';
-  tr.className = l.conf==='bad'? 'bad':'';
-  tr.querySelector('.pill').className='pill '+l.conf;
-  tr.querySelector('.pill').textContent = l.conf==='good'? 'set by you':'no match';
-  rebuildLinks();
-  $('copyCount').textContent=Object.keys(FILES).length+' linked';
+  COPY_SUMMARY = total+' copies from Drive · '+(total-need)+' matched'+(need? ' · '+need+' not matched':'');
+  if(need) COPY_UNMATCHED = LINKS.filter(function(l){return l.conf!=='good';});
+  else COPY_UNMATCHED = [];
   renderMatrix();
 }
+var COPY_SUMMARY='', COPY_UNMATCHED=[];
 
 function isDrive(f){ return f && f.drive===true; }
 function driveViewUrl(f){ return 'https://drive.google.com/file/d/'+f.id+'/view'; }
@@ -2058,7 +2002,6 @@ $('btnSettings').onclick=function(){
 $('btnDrvConnect').onclick=driveConnect;
 $('btnDrvClose').onclick=function(){ $('drivePanel').className='panel conn hide'; };
 $('btnCopies').onclick=downloadCopies;
-$('btnCloseCopy').onclick=function(){ $('copyPanel').className='panel scan hide'; };
 $('btnPrint').onclick=function(){window.print();};
 $('btnExport').onclick=exportCsv;
 $('q').oninput=function(){FILTER.q=this.value;renderMatrix();};
