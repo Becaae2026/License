@@ -299,6 +299,62 @@ button{cursor:pointer}
 .mini select{border:1px solid var(--rule);background:#fbfcff;border-radius:6px;padding:5px 7px;
   font-size:12px;min-width:130px}
 .mini select:focus{outline:2px solid var(--bec-lt);outline-offset:-1px}
+/* ---------- header tiles ---------- */
+.tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  min-width:62px;padding:7px 10px 6px;border-radius:9px;border:1px solid rgba(255,255,255,.34);
+  background:rgba(255,255,255,.13);color:#fff;font-size:10.5px;font-weight:600;letter-spacing:.04em;
+  transition:background .13s,border-color .13s,transform .13s}
+.tile svg{width:17px;height:17px;fill:currentColor;display:block}
+.tile:hover{background:rgba(255,255,255,.26);border-color:#fff;transform:translateY(-1px)}
+.tile:active{transform:translateY(0)}
+.tile.ghost{min-width:0;padding:9px 10px;background:transparent}
+.tile.busy{opacity:.6;pointer-events:none}
+.tile.busy svg{animation:spin .8s linear infinite}
+
+/* ---------- minimised connection row ---------- */
+.conn{margin-top:14px}
+.conn-row{display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:11px 16px}
+.conn-lab{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--bec);font-weight:600}
+.conn-msg{font-size:12px;color:var(--ink-3);font-family:"IBM Plex Mono",monospace}
+.conn-row .spacer{flex:1}
+.btn.sm{padding:5px 11px;font-size:12px;background:var(--bec);border-color:var(--bec);color:#fff}
+.btn.sm:hover{background:var(--bec-lt);border-color:var(--bec-lt)}
+.btn.ghost{background:transparent;border-color:var(--rule);color:var(--ink-2)}
+.btn.ghost:hover{background:#eef4ff;border-color:var(--bec-lt);color:var(--bec)}
+.opt{text-transform:none;letter-spacing:0;color:var(--ink-3);font-weight:400}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:4px;margin-top:20px;border-bottom:2px solid var(--rule)}
+.tab{background:transparent;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;
+  padding:10px 18px;font-size:13.5px;font-weight:600;color:var(--ink-3);border-radius:8px 8px 0 0}
+.tab:hover{color:var(--bec);background:#eef4ff}
+.tab.on{color:var(--bec-dk);border-bottom-color:var(--bec)}
+
+/* ---------- upload ---------- */
+.up-form{display:flex;gap:14px;flex-wrap:wrap;padding:16px 18px 6px}
+.up-form label{display:flex;flex-direction:column;gap:6px;flex:1;min-width:200px;
+  font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--bec);
+  font-family:"IBM Plex Mono",monospace;font-weight:600}
+.up-form select,.up-form input{border:1px solid var(--rule);background:#fbfcff;border-radius:8px;
+  padding:9px 12px;font-size:13px;letter-spacing:0;text-transform:none;font-family:"IBM Plex Sans",sans-serif}
+.up-form select:focus,.up-form input:focus{outline:2px solid var(--bec-lt);outline-offset:-1px;background:#fff}
+.up-drop{margin:8px 18px 0;border:2px dashed var(--rule);border-radius:12px;padding:26px 18px;
+  text-align:center;transition:border-color .15s,background .15s}
+.up-drop.hot{border-color:var(--bec-lt);background:#f2f7ff}
+.up-drop.has{border-style:solid;border-color:var(--valid);background:#f2fbf7}
+.up-drop p{margin:0;color:var(--ink-2);font-size:13.5px}
+.up-target{margin-top:8px!important;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3)}
+.linkish{background:none;border:0;color:var(--bec-lt);text-decoration:underline;font-size:13.5px;padding:0}
+.up-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:16px 18px}
+.up-actions .spacer{flex:1}
+.up-actions .btn-solid{background:var(--valid);border-color:var(--valid);color:#fff}
+.up-actions .btn-solid:hover{background:#059669;border-color:#059669}
+.up-actions .btn-solid:disabled{opacity:.45;cursor:default}
+.up-log{margin:0 18px 16px;border-top:1px solid var(--rule-soft);padding-top:12px;
+  font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2)}
+.up-log div{padding:3px 0}
+.up-log .ok{color:var(--valid)} .up-log .er{color:var(--expired)}
 .hide{display:none!important}
 
 @media(max-width:900px){
@@ -331,9 +387,15 @@ button{cursor:pointer}
       </div>
     </div>
     <div class="tools">
-      <button class="btn btn-solid" id="btnRefresh">Refresh from Drive</button>
-      <button class="btn" id="btnPrint">Print</button>
-      <button class="btn" id="btnSettings" title="Drive connection">&#9881;</button>
+      <button class="tile" id="btnRefresh" title="Reload data and files from Google Drive">
+        <svg viewBox="0 0 24 24"><path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
+        <span>Reload</span></button>
+      <button class="tile" id="btnPrint" title="Print the register">
+        <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6h1a2 2 0 0 1 2 2v6h-4v4H7v-4H3v-6a2 2 0 0 1 2-2h1zm2 0h8V5H8v4zm1 8v4h6v-4H9z"/></svg>
+        <span>Print</span></button>
+      <button class="tile ghost" id="btnSettings" title="Drive connection">
+        <svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4l2 1.6-1.6 2.8-2.4-.8a7.6 7.6 0 0 1-1.7 1l-.4 2.5h-3.2l-.4-2.5a7.6 7.6 0 0 1-1.7-1l-2.4.8L5.6 13.6 7.6 12l-2-1.6 1.6-2.8 2.4.8c.5-.4 1.1-.7 1.7-1l.4-2.5h3.2l.4 2.5c.6.3 1.2.6 1.7 1l2.4-.8 1.6 2.8L21 12z"/></svg>
+      </button>
     </div>
   </div>
 </header>
@@ -349,32 +411,28 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <section class="panel scan hide" id="drivePanel">
-    <div class="scan-head">
-      <div>
-        <h2>Google Drive folder</h2>
-        <span class="sub">Point at the Drive folder holding your license copies. Files stay in Drive &mdash; the dashboard just links to them.</span>
-      </div>
-      <div class="legend"><span id="drvBadge" class="pill maybe">not connected</span></div>
+  <section class="panel conn hide" id="drivePanel">
+    <div class="conn-row">
+      <span class="conn-lab">Google Drive</span>
+      <span id="drvBadge" class="pill maybe">not connected</span>
+      <span class="conn-msg" id="drvStatus"></span>
+      <span class="spacer"></span>
+      <button class="btn sm" id="btnDrvConnect">Reconnect</button>
+      <button class="btn sm ghost" id="btnDrvEdit">Edit</button>
+      <button class="btn sm ghost" id="btnDrvClose">Close</button>
     </div>
-    <div class="drive-form">
+    <div class="drive-form hide" id="drvForm">
       <label>Folder link or ID
         <input type="text" id="drvFolder" placeholder="https://drive.google.com/drive/folders/1AbC...">
       </label>
       <label>Google API key
         <input type="password" id="drvKey" placeholder="AIza...">
       </label>
-      <div class="drive-actions">
-        <button class="btn btn-solid" id="btnDrvConnect">Get files</button>
-        <button class="btn" id="btnDrvClose">Close</button>
-      </div>
+      <label>OAuth client ID <span class="opt">(needed only for uploading)</span>
+        <input type="text" id="drvClient" placeholder="...apps.googleusercontent.com">
+      </label>
     </div>
     <div class="drive-files hide" id="drvFiles"></div>
-    <div class="scan-status" id="drvStatus"></div>
-    <div class="copies-note">
-      Setup, once: share the folder as <em>Anyone with the link &middot; Viewer</em>, then create an API key in Google Cloud with the Drive API enabled and restrict it to your site.
-      After connecting, bookmark the page &mdash; the folder and key ride along in the address so it reconnects by itself.
-    </div>
   </section>
 
   <section class="panel scan hide" id="copyPanel">
@@ -394,6 +452,53 @@ button{cursor:pointer}
       <button class="btn" id="btnCloseCopy">Close</button>
       <span class="spacer"></span>
       <span class="sub" id="copyHint"></span>
+    </div>
+  </section>
+
+  <div class="tabs hide" id="tabs">
+    <button class="tab on" data-tab="dash">Dashboard</button>
+    <button class="tab" data-tab="upload">Upload licence</button>
+  </div>
+
+  <section id="uploadTab" class="hide">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Upload a new licence copy</h2>
+          <span class="sub">Choose the branch and category. The file is renamed to the branch code and replaces the copy in Drive.</span>
+        </div>
+        <span id="upBadge" class="pill maybe">sign-in required</span>
+      </div>
+
+      <div class="up-form">
+        <label>Branch
+          <select id="upBranch"><option value="">— choose branch —</option></select>
+        </label>
+        <label>Licence category
+          <select id="upType">
+            <option value="Commercial">Commercial</option>
+            <option value="Fire">Fire</option>
+            <option value="Signboard">Signboard</option>
+          </select>
+        </label>
+        <label>New expiry date <span class="opt">(optional)</span>
+          <input type="text" id="upExpiry" placeholder="dd/mm/yyyy">
+        </label>
+      </div>
+
+      <div class="up-drop" id="upDrop">
+        <input type="file" id="upFile" accept=".pdf,.jpg,.jpeg,.png" class="hide">
+        <p id="upFileMsg">Drop the licence PDF here, or <button class="linkish" id="upPick">choose a file</button></p>
+        <p class="up-target" id="upTarget"></p>
+      </div>
+
+      <div class="up-actions">
+        <button class="btn btn-solid" id="btnUpload">Upload to Drive</button>
+        <button class="btn ghost" id="btnUpDownload">Download renamed copy</button>
+        <span class="spacer"></span>
+        <span class="sub" id="upHint"></span>
+      </div>
+      <div class="up-log hide" id="upLog"></div>
     </div>
   </section>
 
@@ -462,6 +567,7 @@ button{cursor:pointer}
    ===================================================================== */
 var DRIVE_FOLDER  = '1Xv-LbyxLh62mjSgJboKa1ftu_R-gKpfo';   // BEC LICENSES folder
 var DRIVE_API_KEY = 'AIzaSyBWotg6wY3dg3r3jyYDI9yLBzppdh804S4';   // Drive API, restricted
+var DRIVE_CLIENT_ID = '';   // OAuth client ID — only needed to UPLOAD files back to Drive
 /* ===================================================================== */
 
 /* ============ state ============ */
@@ -631,7 +737,7 @@ function ingest(rows, source){
   $('parseWarn').className = warn.length? 'warn':'warn hide';
   $('parseWarn').textContent = warn.join(' ');
   buildRows(); renderAll();
-  $('empty').className='hide'; $('app').className='';
+  $('empty').className='hide'; $('tabs').className='tabs'; showTab('dash');
   if(DRIVE.connected) buildDriveLinks(); else maybeAutoConnectDrive();
 
   function pick(list,re){for(var i=0;i<list.length;i++){if(re.test(list[i].n))return list[i];}return null;}
@@ -967,7 +1073,7 @@ function sampleData(){
   RAW=out; SRC='Sample data (not your branches)'; TYPES=['Commercial','Fire','Signboard'];
   $('parseWarn').className='warn hide';
   buildRows(); renderAll();
-  $('empty').className='hide'; $('app').className='';
+  $('empty').className='hide'; $('tabs').className='tabs'; showTab('dash');
   if(DRIVE.connected) buildDriveLinks(); else maybeAutoConnectDrive();
 }
 
@@ -1230,7 +1336,7 @@ function applyScan(){
   });
   SRC = SRC? SRC+' + PDF scan' : 'PDF scan';
   buildRows(); renderAll();
-  $('empty').className='hide'; $('app').className='';
+  $('empty').className='hide'; $('tabs').className='tabs'; showTab('dash');
   if(DRIVE.connected) buildDriveLinks(); else maybeAutoConnectDrive();
   $('parseWarn').className = skipped? 'warn':'warn hide';
   $('parseWarn').textContent = skipped? skipped+' file'+(skipped>1?'s were':' was')+' left out — fill in the missing branch, type or date in the scan panel and apply again.' : '';
@@ -1558,7 +1664,7 @@ function downloadCopies(){
 function copiesLinked(){ return Object.keys(FILES).length; }
 
 /* ============ google drive ============ */
-var DRIVE={folder:'',key:'',connected:false,copies:[],data:[]};
+var DRIVE={folder:'',key:'',connected:false,copies:[],data:[],folderIds:{}};
 var DRIVE_FOLDER_MIME='application/vnd.google-apps.folder';
 var SHEET_MIME='application/vnd.google-apps.spreadsheet';
 
@@ -1586,7 +1692,10 @@ function driveWalk(id, prefix, depth){
   return driveListFolder(id).then(function(items){
     var out=[], subs=[];
     items.forEach(function(it){
-      if(it.mimeType===DRIVE_FOLDER_MIME){ if(depth>0) subs.push(it); }
+      if(it.mimeType===DRIVE_FOLDER_MIME){
+        var t=typeOf(it.name); if(t) DRIVE.folderIds[t]=it.id;
+        if(depth>0) subs.push(it);
+      }
       else out.push({drive:true,id:it.id,name:it.name,mime:it.mimeType,
                      modified:it.modifiedTime,path:prefix+it.name});
     });
@@ -1608,9 +1717,8 @@ function driveConnect(){
   var key=$('drvKey').value.trim();
   if(!fid){ drvSay('bad','no folder','That does not look like a Drive folder link. Open the folder in Drive and copy the address bar.'); return; }
   if(!key){ drvSay('bad','no key','An API key is needed so the page can read the folder listing.'); return; }
-  DRIVE.folder=fid; DRIVE.key=key;
+  DRIVE.folder=fid; DRIVE.key=key; DRIVE.folderIds={};
   drvSay('maybe','reading…','Reading the Drive folder…');
-  $('drivePanel').className='panel scan';
   driveWalk(fid,'',2).then(function(items){
     DRIVE.connected=true;
     DRIVE.copies=items.filter(function(i){ return isCopyFile(i.name); });
@@ -1618,6 +1726,8 @@ function driveConnect(){
     var msg=items.length+' item'+(items.length===1?'':'s')+' in Drive · '+
             DRIVE.copies.length+' license copies · '+DRIVE.data.length+' data file'+(DRIVE.data.length===1?'':'s');
     drvSay('good','connected',msg+'.');
+    $('upBadge').className = $('drvClient').value.trim()? 'pill maybe':'pill maybe';
+    $('upBadge').textContent = $('drvClient').value.trim()? 'sign-in required':'upload not configured';
     renderDriveData();
     var reg=pickRegister(DRIVE.data);
     if(reg && !ROWS.length) loadDriveRegister(reg,null);
@@ -1644,7 +1754,7 @@ function drvSay(cls,badge,msg,title){
     $('bootTitle').textContent=title||(cls==='bad'?'Could not reach the Drive folder':'Connecting to Google Drive\u2026');
     $('bootMsg').textContent=msg;
     $('btnBootRetry').className=cls==='bad'?'btn':'btn hide';
-    if(cls==='bad') $('drivePanel').className='panel scan';
+    if(cls==='bad') $('drivePanel').className='panel conn';
   }
 }
 
@@ -1737,6 +1847,7 @@ function maybeAutoConnectDrive(){
 function driveFromHash(){
   if(DRIVE_FOLDER)  $('drvFolder').value=DRIVE_FOLDER;
   if(DRIVE_API_KEY) $('drvKey').value=DRIVE_API_KEY;
+  if(DRIVE_CLIENT_ID) $('drvClient').value=DRIVE_CLIENT_ID;
   var hsh=location.hash.replace(/^#/,'');
   if(hsh){
     hsh.split('&').forEach(function(pair){
@@ -1749,15 +1860,203 @@ function driveFromHash(){
 driveFromHash();
 /* connect as soon as the page opens, if both values are present */
 setTimeout(maybeAutoConnectDrive,0);
+/* ============ tabs ============ */
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.className='tab'+(t.dataset.tab===name?' on':'');
+  });
+  $('app').className = name==='dash' ? '' : 'hide';
+  $('uploadTab').className = name==='upload' ? '' : 'hide';
+  if(name==='upload') fillUploadBranches();
+}
+
+/* ============ upload ============ */
+var UP={file:null,token:null,expires:0};
+
+function fillUploadBranches(){
+  var sel=$('upBranch'), cur=sel.value;
+  sel.innerHTML='<option value="">— choose branch —</option>';
+  ROWS.slice().sort(function(a,b){return a.branch.localeCompare(b.branch);})
+    .forEach(function(r){
+      var o=document.createElement('option');
+      o.value=r.branch;
+      o.textContent=(r.code? r.code+' — ':'')+r.branch;
+      sel.appendChild(o);
+    });
+  sel.value=cur;
+  upTarget();
+}
+function upCode(){
+  var b=$('upBranch').value;
+  var r=ROWS.filter(function(x){return x.branch===b;})[0];
+  return r? (r.code||'') : '';
+}
+function upExt(){
+  if(!UP.file) return '.pdf';
+  var m=String(UP.file.name).match(/\.[a-z0-9]+$/i);
+  return m? m[0].toLowerCase() : '.pdf';
+}
+function upName(){
+  var c=upCode();
+  return (c || $('upBranch').value.replace(/[^\w-]+/g,'-')) + upExt();
+}
+function upFolderName(){ return $('upType').value+' Licenses'; }
+
+function upTarget(){
+  var b=$('upBranch').value, t=$('upType').value;
+  var el=$('upTarget'), btn=$('btnUpload');
+  if(!b){ el.textContent=''; btn.disabled=true; return; }
+  var existing=FILES[copyKey(b,t)];
+  var msg='Saves as '+upName()+' in '+upFolderName();
+  msg += existing? '  ·  replaces the copy already there' : '  ·  new file';
+  if(!upCode()) msg+='  ·  no branch code on this row';
+  el.textContent=msg;
+  btn.disabled = !UP.file;
+}
+function upSetFile(f){
+  UP.file=f;
+  $('upFileMsg').textContent=f? f.name+'  ('+Math.round(f.size/1024)+' KB)' : '';
+  if(!f) $('upFileMsg').innerHTML='Drop the licence PDF here, or <button class="linkish" id="upPick">choose a file</button>';
+  $('upDrop').className='up-drop'+(f?' has':'');
+  upTarget();
+  if(!f) $('upPick').onclick=function(){ $('upFile').click(); };
+}
+function upSay(msg,cls){
+  var box=$('upLog'); box.className='up-log';
+  var d=document.createElement('div');
+  if(cls) d.className=cls;
+  d.textContent=msg; box.appendChild(d);
+}
+
+/* --- OAuth: an API key can only read; writing needs a signed-in user --- */
+function gisReady(cb){
+  if(window.google && google.accounts && google.accounts.oauth2) return cb(true);
+  var s=document.createElement('script');
+  s.src='https://accounts.google.com/gsi/client';
+  s.onload=function(){ cb(!!(window.google&&google.accounts&&google.accounts.oauth2)); };
+  s.onerror=function(){ cb(false); };
+  document.head.appendChild(s);
+}
+function upToken(cb){
+  if(UP.token && Date.now()<UP.expires-30000) return cb(UP.token);
+  var cid=$('drvClient').value.trim();
+  if(!cid){ cb(null,'no-client'); return; }
+  gisReady(function(ok){
+    if(!ok){ cb(null,'Could not load the Google sign-in library.'); return; }
+    try{
+      var tc=google.accounts.oauth2.initTokenClient({
+        client_id:cid,
+        scope:'https://www.googleapis.com/auth/drive',
+        callback:function(resp){
+          if(resp && resp.access_token){
+            UP.token=resp.access_token;
+            UP.expires=Date.now()+(resp.expires_in||3600)*1000;
+            $('upBadge').className='pill good'; $('upBadge').textContent='signed in';
+            cb(UP.token);
+          } else cb(null,'Sign-in was cancelled or refused.');
+        }
+      });
+      tc.requestAccessToken();
+    }catch(e){ cb(null,'Sign-in failed: '+e.message); }
+  });
+}
+
+function doUpload(){
+  var b=$('upBranch').value, t=$('upType').value;
+  if(!b){ upSay('Choose a branch first.','er'); return; }
+  if(!UP.file){ upSay('Choose the licence file first.','er'); return; }
+  var folderId=DRIVE.folderIds[t];
+  if(!folderId){ upSay('Could not find the "'+upFolderName()+'" folder in Drive — press Reload and try again.','er'); return; }
+
+  upToken(function(tok,err){
+    if(!tok){
+      if(err==='no-client'){
+        upSay('Uploading to Drive needs an OAuth client ID — an API key can only read. Add one under the gear icon, or use "Download renamed copy" and drop the file into Drive yourself.','er');
+        $('upBadge').className='pill bad'; $('upBadge').textContent='upload not configured';
+      } else upSay(err,'er');
+      return;
+    }
+    var existing=FILES[copyKey(b,t)];
+    var name=upName();
+    $('btnUpload').disabled=true;
+    upSay('Uploading '+name+' …');
+
+    var done=function(ok,detail){
+      $('btnUpload').disabled=false;
+      if(ok){
+        upSay('Saved '+name+' to '+upFolderName()+(existing?' (replaced the previous copy)':''),'ok');
+        var d=parseDate($('upExpiry').value);
+        if(d) upSay('Note: the expiry date in the tracker is not changed by this upload — update '+
+                    dmy(d)+' in the spreadsheet as well.','er');
+        UP.token && setTimeout(function(){ driveConnect(); }, 800);
+        upSetFile(null); $('upFile').value='';
+      } else upSay('Upload failed: '+detail,'er');
+    };
+
+    if(existing && existing.drive){
+      // keep the same file id so any existing Drive links stay valid
+      fetch('https://www.googleapis.com/upload/drive/v3/files/'+existing.id+'?uploadType=media',
+        {method:'PATCH',headers:{'Authorization':'Bearer '+tok,'Content-Type':UP.file.type||'application/pdf'},body:UP.file})
+        .then(function(r){ return r.ok? r.json().then(function(){done(true);})
+                                      : r.text().then(function(x){done(false,x.slice(0,160));}); })
+        .catch(function(e){ done(false,e.message); });
+      return;
+    }
+    var meta={name:name,parents:[folderId]};
+    var fd=new FormData();
+    fd.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
+    fd.append('file',UP.file);
+    fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true',
+      {method:'POST',headers:{'Authorization':'Bearer '+tok},body:fd})
+      .then(function(r){ return r.ok? r.json().then(function(){done(true);})
+                                    : r.text().then(function(x){done(false,x.slice(0,160));}); })
+      .catch(function(e){ done(false,e.message); });
+  });
+}
+
+function downloadRenamed(){
+  if(!UP.file){ upSay('Choose the licence file first.','er'); return; }
+  if(!$('upBranch').value){ upSay('Choose a branch first.','er'); return; }
+  saveBlob(UP.file, upName());
+  upSay('Saved '+upName()+' to your downloads — drop it into the '+upFolderName()+' folder in Drive.','ok');
+}
+
 /* ============ wiring ============ */
-$('btnRefresh').onclick=function(){ driveConnect(); };
+$('btnRefresh').onclick=function(){
+  var t=$('btnRefresh'); t.className='tile busy';
+  driveConnect();
+  setTimeout(function(){ t.className='tile'; }, 1400);
+};
+document.querySelectorAll('.tab').forEach(function(t){
+  t.onclick=function(){ showTab(t.dataset.tab); };
+});
+$('btnDrvEdit').onclick=function(){
+  var f=$('drvForm');
+  f.className = f.className.indexOf('hide')>=0 ? 'drive-form' : 'drive-form hide';
+};
+$('upBranch').onchange=upTarget;
+$('upType').onchange=upTarget;
+$('upPick').onclick=function(){ $('upFile').click(); };
+$('upFile').onchange=function(e){ if(e.target.files[0]) upSetFile(e.target.files[0]); };
+$('btnUpload').onclick=doUpload;
+$('btnUpDownload').onclick=downloadRenamed;
+(function(){
+  var d=$('upDrop');
+  ['dragenter','dragover'].forEach(function(ev){
+    d.addEventListener(ev,function(e){e.preventDefault();d.classList.add('hot');});
+  });
+  ['dragleave','drop'].forEach(function(ev){
+    d.addEventListener(ev,function(e){e.preventDefault();d.classList.remove('hot');});
+  });
+  d.addEventListener('drop',function(e){ if(e.dataTransfer.files[0]) upSetFile(e.dataTransfer.files[0]); });
+})();
 $('btnBootRetry').onclick=function(){ driveConnect(); };
 $('btnSettings').onclick=function(){
   var el=$('drivePanel');
-  el.className = el.className.indexOf('hide')>=0 ? 'panel scan' : 'panel scan hide';
+  el.className = el.className.indexOf('hide')>=0 ? 'panel conn' : 'panel conn hide';
 };
 $('btnDrvConnect').onclick=driveConnect;
-$('btnDrvClose').onclick=function(){ $('drivePanel').className='panel scan hide'; };
+$('btnDrvClose').onclick=function(){ $('drivePanel').className='panel conn hide'; };
 $('btnCopies').onclick=downloadCopies;
 $('btnCloseCopy').onclick=function(){ $('copyPanel').className='panel scan hide'; };
 $('btnPrint').onclick=function(){window.print();};
