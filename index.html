@@ -523,6 +523,7 @@ body.locked{overflow:hidden}
     <button class="tab on" data-tab="dash">Dashboard</button>
     <button class="tab" data-tab="upload">Upload licence</button>
     <button class="tab" data-tab="branch">Manage branches</button>
+    <button class="tab hide" data-tab="users">Users</button>
   </div>
 
   <section id="uploadTab" class="hide">
@@ -634,6 +635,41 @@ body.locked{overflow:hidden}
     </div>
   </div>
 
+  <section id="usersTab" class="hide">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>User accounts</h2>
+          <span class="sub">Accounts are kept on the &ldquo;Users&rdquo; tab of the tracker Sheet. Passwords are stored as a hash, never in clear.</span>
+        </div>
+        <span id="usBadge" class="pill maybe">sign-in required</span>
+      </div>
+
+      <div style="overflow-x:auto"><table class="mini" id="usTable"><thead><tr>
+        <th>Username</th><th>Display name</th><th>Role</th><th>Source</th><th></th>
+      </tr></thead><tbody id="usBody"></tbody></table></div>
+
+      <div class="panel-head" style="border-top:1px solid var(--rule-soft);border-bottom:0">
+        <div><h2 style="font-size:14px">Add or update an account</h2>
+        <span class="sub">Using an existing username replaces that account&rsquo;s password.</span></div>
+      </div>
+      <div class="up-form">
+        <label>Username<input type="text" id="usUser" placeholder="e.g. priya" autocomplete="off"></label>
+        <label>Display name<input type="text" id="usName" placeholder="e.g. Priya" autocomplete="off"></label>
+        <label>Role
+          <select id="usRole"><option value="user">User</option><option value="admin">Admin</option></select>
+        </label>
+        <label>Password<input type="password" id="usPass" placeholder="min 8 characters" autocomplete="new-password"></label>
+      </div>
+      <div class="up-actions">
+        <button class="btn btn-solid" id="btnSaveUser">Save account</button>
+        <span class="spacer"></span>
+        <span class="sub">Admins can manage users and branches. Users see the dashboard and can upload licences.</span>
+      </div>
+      <div class="up-log hide" id="usLog"></div>
+    </div>
+  </section>
+
   <main id="app" class="hide">
     <div id="parseWarn" class="warn hide"></div>
     <div id="copyWarn" class="warn hide"></div>
@@ -711,17 +747,20 @@ var DRIVE_SHEET_ID  = '1oQSsreJJMjavvyZACGxkzs5u02IYoCr-ulPXx5n3fHI';   // the t
    address — it gives you the hash to paste here. Usernames are lower-case.
    ===================================================================== */
 var USERS=[
-  {u:'admin', name:'Administrator',
-   h:'151df82663c773de8fe535c24c58d66cafb21b6159883b802d40eca5471aca28'},   // admin / bec2026
-  {u:'salih', name:'Salih',
-   h:'85677a5a749cc2e6be3035663a07c0e199386ad02070d75588e23105746d5d59'},   // salih / salih2026
-  {u:'aneesh', name:'Aneesh',
-   h:'eb7f26efe0b3f55141e77ad726fa91c8b60890481025da88c01ee3750dc62e7d'}    // aneesh
+  {u:'admin', name:'Administrator', role:'admin',
+   h:'151df82663c773de8fe535c24c58d66cafb21b6159883b802d40eca5471aca28'},
+  {u:'salih', name:'Salih', role:'admin',
+   h:'85677a5a749cc2e6be3035663a07c0e199386ad02070d75588e23105746d5d59'},
+  {u:'aneesh', name:'Aneesh', role:'admin',
+   h:'eb7f26efe0b3f55141e77ad726fa91c8b60890481025da88c01ee3750dc62e7d'}
 ];
+var USER_TAB='Users';      // tab in the tracker Sheet holding accounts added later
+var SHEET_USERS=[];        // loaded from that tab at start-up
+function allUsers(){ return USERS.concat(SHEET_USERS); }
 var SESSION_HOURS=8;
 /* ===================================================================== */
 
-var AUTH={user:null};
+var AUTH={user:null,role:'user',uname:''};
 
 function sha256(txt){
   if(!(window.crypto && crypto.subtle))
@@ -736,7 +775,8 @@ function sha256(txt){
 function store(){ try{ return window.sessionStorage; }catch(e){ return null; } }
 function saveSession(u){
   var s=store(); if(!s) return;
-  try{ s.setItem('bec_auth', JSON.stringify({u:u.u,name:u.name,exp:Date.now()+SESSION_HOURS*3600000})); }catch(e){}
+  try{ s.setItem('bec_auth', JSON.stringify({u:u.u,name:u.name,role:u.role||'user',
+       exp:Date.now()+SESSION_HOURS*3600000})); }catch(e){}
 }
 function readSession(){
   var s=store(); if(!s) return null;
@@ -752,8 +792,9 @@ function signOut(){
   AUTH.user=null; UP.token=null; UP.expires=0;
   location.reload();
 }
-function unlock(name){
-  AUTH.user=name;
+function unlock(name,role,uname){
+  AUTH.user=name; AUTH.role=role||'user'; AUTH.uname=uname||'';
+  applyRole();
   $('gate').className='gate hide';
   document.body.className='';
   setStick();
@@ -767,7 +808,7 @@ function gateSubmit(e){
   if(!u||!p){ err.className='gate-err'; err.textContent='Enter a username and password.'; return; }
   $('gGo').disabled=true;
   sha256(u+':'+p).then(function(hash){
-    var hit=USERS.filter(function(x){ return x.u===u && x.h===hash; })[0];
+    var hit=allUsers().filter(function(x){ return x.u===u && x.h===hash; })[0];
     $('gGo').disabled=false;
     if(!hit){
       err.className='gate-err';
@@ -777,7 +818,7 @@ function gateSubmit(e){
     }
     err.className='gate-err hide';
     saveSession(hit);
-    unlock(hit.name);
+    unlock(hit.name, hit.role, hit.u);
   }).catch(function(ex){
     $('gGo').disabled=false;
     err.className='gate-err'; err.textContent=ex.message;
@@ -2108,13 +2149,18 @@ function driveFromHash(){
 }
 driveFromHash();
 /* ============ tabs ============ */
+var ADMIN_TABS={branch:1,users:1};
+function tabAllowed(n){ return !ADMIN_TABS[n] || AUTH.role==='admin'; }
 function showTab(name){
+  if(!tabAllowed(name)) name='dash';
   document.querySelectorAll('.tab').forEach(function(t){
-    t.className='tab'+(t.dataset.tab===name?' on':'');
+    t.className='tab'+(t.dataset.tab===name?' on':'')+(tabAllowed(t.dataset.tab)?'':' hide');
   });
   $('app').className = name==='dash' ? '' : 'hide';
   $('uploadTab').className = name==='upload' ? '' : 'hide';
   $('branchTab').className = name==='branch' ? '' : 'hide';
+  $('usersTab').className = name==='users' ? '' : 'hide';
+  if(name==='users'){ renderUsers(); usBadge(); }
   if(name==='upload'){ fillUploadBranches(); upBadge(); }
   if(name==='branch'){ buildBranchGrid(); brBadge(); fillDeleteBranches(); }
 }
@@ -2781,6 +2827,144 @@ function sheetDeleteRow(row,tok,cb){
     .catch(function(e){ cb(false,e.message); });
 }
 
+
+/* ============ accounts kept on the Sheet ============ */
+function loadSheetUsers(after){
+  SHEET_USERS=[];
+  var id=DRIVE_SHEET_ID, key=DRIVE_API_KEY;
+  if(!id||!key) return after();
+  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+id+'/values/'+encodeURIComponent(USER_TAB)+
+        '?valueRenderOption=UNFORMATTED_VALUE&key='+encodeURIComponent(key))
+    .then(function(r){ return r.ok? r.json() : null; })
+    .then(function(j){
+      var rows=(j&&j.values)||[];
+      rows.forEach(function(r,i){
+        if(i===0 && /user/i.test(String(r[0]||''))) return;      // header
+        var u=String(r[0]||'').trim().toLowerCase();
+        var hsh=String(r[3]||'').trim().toLowerCase();
+        if(!u||hsh.length!==64) return;
+        SHEET_USERS.push({u:u, name:String(r[1]||u).trim(), role:(String(r[2]||'user').trim().toLowerCase()==='admin'?'admin':'user'), h:hsh, sheet:true});
+      });
+    })
+    .catch(function(){})
+    .then(function(){ after(); });
+}
+
+function applyRole(){
+  var cur=document.querySelector('.tab.on');
+  showTab(cur? cur.dataset.tab : 'dash');
+  var so=$('btnSignOut');
+  if(so) so.title='Signed in as '+(AUTH.user||'')+(AUTH.role==='admin'?' (admin)':'')+' — sign out';
+}
+
+function usSay(msg,cls){
+  var box=$('usLog'); box.className='up-log';
+  var d=document.createElement('div'); if(cls) d.className=cls; d.textContent=msg; box.appendChild(d);
+}
+function usBadge(){
+  var el=$('usBadge');
+  if(UP.token && Date.now()<UP.expires-30000){ el.className='pill good'; el.textContent='signed in'; return; }
+  el.className='pill maybe'; el.textContent='sign-in required to save';
+}
+
+function renderUsers(){
+  var body=$('usBody'); body.innerHTML='';
+  allUsers().forEach(function(u){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td class="mono">'+esc(u.u)+'</td><td>'+esc(u.name)+'</td>'+
+      '<td>'+(u.role==='admin'? '<span class="pill good">admin</span>':'<span class="pill maybe">user</span>')+'</td>'+
+      '<td class="mono" style="font-size:11px;color:var(--ink-3)">'+(u.sheet?'Sheet':'built into the page')+'</td>';
+    var td=document.createElement('td');
+    if(u.sheet && u.u!==AUTH.uname){
+      var b=document.createElement('button');
+      b.className='btn danger-btn'; b.style.padding='4px 10px'; b.textContent='Remove';
+      b.onclick=function(){
+        if(confirm('Remove the account "'+u.u+'"? They will not be able to sign in.')) removeUser(u.u);
+      };
+      td.appendChild(b);
+    } else {
+      td.innerHTML='<span class="cell-empty">'+(u.u===AUTH.uname? 'you' : 'edit in index.html')+'</span>';
+    }
+    tr.appendChild(td); body.appendChild(tr);
+  });
+}
+
+function usersRange(){ return "'"+USER_TAB.replace(/'/g,"''")+"'!A1:D"; }
+
+function writeUsers(list,tok,cb){
+  var rows=[['Username','Display name','Role','Password hash']];
+  list.forEach(function(u){ rows.push([u.u,u.name,u.role,u.h]); });
+  for(var i=0;i<6;i++) rows.push(['','','','']);       // clear any removed rows
+  ensureUserTab(tok,function(ok,msg){
+    if(!ok){ cb(false,msg); return; }
+    fetch('https://sheets.googleapis.com/v4/spreadsheets/'+DRIVE_SHEET_ID+'/values/'+
+          encodeURIComponent(usersRange()+rows.length)+'?valueInputOption=RAW',
+      {method:'PUT',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+       body:JSON.stringify({values:rows})})
+      .then(function(r){
+        if(!r.ok) return r.text().then(function(x){ throw new Error(x.slice(0,140)); });
+        cb(true);
+      })
+      .catch(function(e){ cb(false,e.message); });
+  });
+}
+function ensureUserTab(tok,cb){
+  if(DRIVE.sheetIds && DRIVE.sheetIds[USER_TAB]!==undefined) return cb(true);
+  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+DRIVE_SHEET_ID+':batchUpdate',
+    {method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+     body:JSON.stringify({requests:[{addSheet:{properties:{title:USER_TAB}}}]})})
+    .then(function(r){ return r.json().then(function(j){
+        if(!r.ok){
+          if(/already exists/i.test(JSON.stringify(j))) return cb(true);
+          throw new Error((j.error&&j.error.message)||'could not create the Users tab');
+        }
+        var pr=j.replies&&j.replies[0]&&j.replies[0].addSheet&&j.replies[0].addSheet.properties;
+        if(pr){ DRIVE.sheetIds=DRIVE.sheetIds||{}; DRIVE.sheetIds[USER_TAB]=pr.sheetId; }
+        cb(true);
+      }); })
+    .catch(function(e){ cb(false,e.message); });
+}
+
+function saveUser(){
+  var u=$('usUser').value.trim().toLowerCase();
+  var nm=$('usName').value.trim() || u;
+  var role=$('usRole').value;
+  var pw=$('usPass').value;
+  if(!/^[a-z0-9._-]{3,20}$/.test(u)){ usSay('Username must be 3–20 characters, letters and numbers only.','er'); return; }
+  if(pw.length<8){ usSay('Password must be at least 8 characters.','er'); return; }
+  var builtin=USERS.filter(function(x){return x.u===u;})[0];
+  if(builtin){ usSay('"'+u+'" is built into index.html — change it there, or pick a different username.','er'); return; }
+
+  upToken(function(tok,err){
+    if(!tok){ usSay(err==='no-client'? 'Saving an account writes to the Sheet, which needs Google sign-in.' : err,'er'); return; }
+    usBadge();
+    sha256(u+':'+pw).then(function(hash){
+      var list=SHEET_USERS.slice().filter(function(x){return x.u!==u;});
+      list.push({u:u,name:nm,role:role,h:hash,sheet:true});
+      list.sort(function(a,b){return a.u.localeCompare(b.u);});
+      $('btnSaveUser').disabled=true;
+      writeUsers(list,tok,function(ok,msg){
+        $('btnSaveUser').disabled=false;
+        if(!ok){ usSay('Not saved: '+msg,'er'); return; }
+        SHEET_USERS=list;
+        usSay('Saved "'+u+'" as '+role+'.','ok');
+        $('usUser').value=''; $('usName').value=''; $('usPass').value='';
+        renderUsers();
+      });
+    });
+  });
+}
+function removeUser(u){
+  upToken(function(tok,err){
+    if(!tok){ usSay(err==='no-client'? 'Removing an account writes to the Sheet, which needs Google sign-in.' : err,'er'); return; }
+    var list=SHEET_USERS.filter(function(x){return x.u!==u;});
+    writeUsers(list,tok,function(ok,msg){
+      if(!ok){ usSay('Not removed: '+msg,'er'); return; }
+      SHEET_USERS=list; usSay('Removed "'+u+'".','ok'); renderUsers();
+    });
+  });
+}
+
 /* ============ wiring ============ */
 $('btnSignOut').onclick=function(){
   if(confirm('Sign out of the licence dashboard?')) signOut();
@@ -2789,9 +2973,11 @@ $('btnSignOut').onclick=function(){
 /* boot: password helper, saved session, or the sign-in screen */
 if(!hashHelper()){
   $('gateForm').onsubmit=gateSubmit;
-  var sess=readSession();
-  if(sess) unlock(sess.name);
-  else { document.body.className='locked'; setTimeout(function(){ $('gUser').focus(); },60); }
+  loadSheetUsers(function(){
+    var sess=readSession();
+    if(sess) unlock(sess.name, sess.role, sess.u);
+    else { document.body.className='locked'; setTimeout(function(){ $('gUser').focus(); },60); }
+  });
 }
 
 $('btnRefresh').onclick=function(){
@@ -2814,6 +3000,7 @@ $('upFile').onchange=function(e){ if(e.target.files[0]) upSetFile(e.target.files
 $('btnUpload').onclick=doUpload;
 $('btnUpDownload').onclick=downloadRenamed;
 $('btnAddBranch').onclick=addBranch;
+$('btnSaveUser').onclick=saveUser;
 $('delBranch').onchange=delSummary;
 $('btnDelBranch').onclick=openConfirm;
 $('cfCancel').onclick=closeConfirm;
