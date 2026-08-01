@@ -355,6 +355,24 @@ button{cursor:pointer}
   font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2)}
 .up-log div{padding:3px 0}
 .up-log .ok{color:var(--valid)} .up-log .er{color:var(--expired)}
+.br-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:6px 18px 4px}
+.br-cat{border:1px solid var(--rule-soft);border-radius:12px;overflow:hidden;background:#fbfcff}
+.br-cat h3{margin:0;padding:10px 14px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;color:#fff;font-weight:600;
+  background:linear-gradient(90deg,var(--bec-dk),var(--bec) 70%,var(--bec-lt))}
+.br-cat .body{padding:12px 14px;display:flex;flex-direction:column;gap:9px}
+.br-cat label{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--bec);
+  font-family:"IBM Plex Mono",monospace;font-weight:600;display:flex;flex-direction:column;gap:5px}
+.br-cat input[type=text]{border:1px solid var(--rule);background:#fff;border-radius:7px;padding:8px 10px;
+  font-size:13px;letter-spacing:0;text-transform:none;font-family:"IBM Plex Sans",sans-serif}
+.br-cat input:focus{outline:2px solid var(--bec-lt);outline-offset:-1px}
+.br-file{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.br-file .btn{padding:5px 11px;font-size:12px;background:var(--bec);border-color:var(--bec);color:#fff}
+.br-file .btn:hover{background:var(--bec-lt);border-color:var(--bec-lt)}
+.br-na{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);
+  letter-spacing:0;text-transform:none;font-family:"IBM Plex Sans",sans-serif;font-weight:400}
+.br-na input{width:15px;height:15px}
+@media(max-width:900px){.br-grid{grid-template-columns:1fr}}
 .hide{display:none!important}
 
 @media(max-width:900px){
@@ -439,6 +457,7 @@ button{cursor:pointer}
   <div class="tabs hide" id="tabs">
     <button class="tab on" data-tab="dash">Dashboard</button>
     <button class="tab" data-tab="upload">Upload licence</button>
+    <button class="tab" data-tab="branch">Add branch</button>
   </div>
 
   <section id="uploadTab" class="hide">
@@ -480,6 +499,36 @@ button{cursor:pointer}
         <span class="sub" id="upHint"></span>
       </div>
       <div class="up-log hide" id="upLog"></div>
+    </div>
+  </section>
+
+  <section id="branchTab" class="hide">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Add a new branch</h2>
+          <span class="sub">Adds a row to the tracker and files the licence copies under the branch code.</span>
+        </div>
+        <span id="brBadge" class="pill maybe">sign-in required</span>
+      </div>
+
+      <div class="up-form">
+        <label>Branch code <span class="opt">(used as the file name)</span>
+          <input type="text" id="brCode" placeholder="e.g. AB5" maxlength="12">
+        </label>
+        <label>Branch name
+          <input type="text" id="brName" placeholder="e.g. ABBASIYA- 5">
+        </label>
+      </div>
+
+      <div class="br-grid" id="brGrid"></div>
+
+      <div class="up-actions">
+        <button class="btn btn-solid" id="btnAddBranch">Add branch</button>
+        <span class="spacer"></span>
+        <span class="sub" id="brHint">Licence files are optional — the row is added either way.</span>
+      </div>
+      <div class="up-log hide" id="brLog"></div>
     </div>
   </section>
 
@@ -1858,7 +1907,9 @@ function showTab(name){
   });
   $('app').className = name==='dash' ? '' : 'hide';
   $('uploadTab').className = name==='upload' ? '' : 'hide';
+  $('branchTab').className = name==='branch' ? '' : 'hide';
   if(name==='upload'){ fillUploadBranches(); upBadge(); }
+  if(name==='branch'){ buildBranchGrid(); brBadge(); }
 }
 
 /* ============ upload ============ */
@@ -2184,6 +2235,185 @@ function setExpiry(wb,branch,code,type,date){
   return {ok:false,msg:'Could not find the '+type+' expiry column in the tracker.'};
 }
 
+
+/* ============ add a new branch ============ */
+var BR_CATS=['Commercial','Fire','Signboard'];
+var BRF={};   // category -> File
+
+function buildBranchGrid(){
+  var g=$('brGrid'); if(g.dataset.built) return; g.dataset.built='1';
+  g.innerHTML='';
+  BR_CATS.forEach(function(cat){
+    var d=document.createElement('div'); d.className='br-cat';
+    d.innerHTML='<h3>'+cat+'</h3><div class="body">'+
+      '<label>Expiry date<input type="text" id="br_'+cat+'_exp" placeholder="dd/mm/yyyy"></label>'+
+      '<label>Licence number<input type="text" id="br_'+cat+'_no" placeholder="optional"></label>'+
+      '<label class="br-na"><input type="checkbox" id="br_'+cat+'_na"> Not applicable</label>'+
+      '<div class="br-file"><button class="btn" id="br_'+cat+'_pick">Choose file</button>'+
+      '<span id="br_'+cat+'_name">no file</span></div>'+
+      '<input type="file" id="br_'+cat+'_file" accept=".pdf,.jpg,.jpeg,.png" class="hide">';
+    g.appendChild(d);
+  });
+  BR_CATS.forEach(function(cat){
+    $('br_'+cat+'_pick').onclick=function(){ $('br_'+cat+'_file').click(); };
+    $('br_'+cat+'_file').onchange=function(e){
+      var f=e.target.files[0]; if(!f) return;
+      BRF[cat]=f; $('br_'+cat+'_name').textContent=f.name+' ('+Math.round(f.size/1024)+' KB)';
+    };
+    $('br_'+cat+'_na').onchange=function(){
+      var off=this.checked;
+      $('br_'+cat+'_exp').disabled=off;
+      if(off) $('br_'+cat+'_exp').value='';
+    };
+  });
+}
+function brSay(msg,cls){
+  var box=$('brLog'); box.className='up-log';
+  var d=document.createElement('div'); if(cls) d.className=cls;
+  d.textContent=msg; box.appendChild(d);
+}
+function brBadge(){
+  var el=$('brBadge');
+  if(UP.token && Date.now()<UP.expires-30000){ el.className='pill good'; el.textContent='signed in'; return; }
+  if(!$('drvClient').value.trim()){ el.className='pill bad'; el.textContent='not configured'; return; }
+  el.className='pill maybe'; el.textContent='sign-in required';
+}
+
+function addBranch(){
+  var code=$('brCode').value.trim().toUpperCase();
+  var name=$('brName').value.trim();
+  if(!code){ brSay('Enter a branch code — it is used as the file name.','er'); return; }
+  if(!name){ brSay('Enter the branch name.','er'); return; }
+  var clash=ROWS.filter(function(r){
+    return String(r.code||'').toUpperCase()===code ||
+           r.branch.toUpperCase()===name.toUpperCase(); })[0];
+  if(clash){ brSay('"'+code+' / '+name+'" already exists in the tracker as "'+clash.branch+'". Use the Upload licence tab instead.','er'); return; }
+
+  var vals={};
+  for(var i=0;i<BR_CATS.length;i++){
+    var c=BR_CATS[i];
+    if($('br_'+c+'_na').checked){ vals[c]={na:true}; continue; }
+    var raw=$('br_'+c+'_exp').value.trim();
+    if(!raw){ vals[c]={blank:true}; continue; }
+    var d=parseDate(raw);
+    if(!d){ brSay(c+' expiry "'+raw+'" is not a date I can read — use dd/mm/yyyy.','er'); return; }
+    vals[c]={date:d,no:$('br_'+c+'_no').value.trim()};
+  }
+
+  upToken(function(tok,err){
+    if(!tok){
+      brSay(err==='no-client'? 'Adding a branch writes to the tracker, which needs sign-in. Add an OAuth client ID under the gear icon.' : err,'er');
+      return;
+    }
+    brBadge();
+    $('btnAddBranch').disabled=true;
+    brSay('Adding '+code+' — '+name+' to the tracker …');
+    sheetAddRow(code,name,vals,tok,function(ok,msg){
+      if(!ok){ brSay('Tracker not updated: '+msg,'er'); $('btnAddBranch').disabled=false; return; }
+      brSay('Tracker: '+msg,'ok');
+      uploadBranchFiles(code,tok,function(){
+        brSay('Done. Reloading from Drive …','ok');
+        $('btnAddBranch').disabled=false;
+        setTimeout(function(){ driveConnect(); resetBranchForm(); }, 900);
+      });
+    });
+  });
+}
+
+function uploadBranchFiles(code,tok,after){
+  var todo=BR_CATS.filter(function(c){ return BRF[c]; });
+  if(!todo.length){ brSay('No licence files chosen — add them later from the Upload licence tab.'); after(); return; }
+  var left=todo.length;
+  todo.forEach(function(c){
+    var f=BRF[c], folderId=DRIVE.folderIds[c];
+    if(!folderId){ brSay('No "'+c+' Licenses" folder found in Drive — '+f.name+' not uploaded.','er');
+                   if(--left===0) after(); return; }
+    var ext=(String(f.name).match(/\.[a-z0-9]+$/i)||['.pdf'])[0].toLowerCase();
+    var nm=code+ext;
+    var fd=new FormData();
+    fd.append('metadata',new Blob([JSON.stringify({name:nm,parents:[folderId]})],{type:'application/json'}));
+    fd.append('file',f);
+    fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true',
+      {method:'POST',headers:{'Authorization':'Bearer '+tok},body:fd})
+      .then(function(r){ return r.ok? r.json() : r.text().then(function(x){ throw new Error(x.slice(0,120)); }); })
+      .then(function(){ brSay('Uploaded '+nm+' to '+c+' Licenses','ok'); })
+      .catch(function(e){ brSay('Could not upload '+nm+': '+e.message,'er'); })
+      .then(function(){ if(--left===0) after(); });
+  });
+}
+
+/* write the new row into the tracker sheet */
+function sheetAddRow(code,name,vals,tok,cb){
+  var reg=DRIVE.register;
+  if(!reg || reg.mime!==SHEET_MIME){
+    cb(false,'the tracker must be a Google Sheet for this — it is currently '+(reg?reg.name:'not loaded'));
+    return;
+  }
+  var tab=DRIVE.sheetTitle||'';
+  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+reg.id+'/values/'+encodeURIComponent(tab)+
+        '?valueRenderOption=UNFORMATTED_VALUE&key='+encodeURIComponent(DRIVE.key))
+    .then(function(r){ return r.json().then(function(j){
+        if(!r.ok) throw new Error((j.error&&j.error.message)||('HTTP '+r.status));
+        return j.values||[];
+      }); })
+    .then(function(rows){
+      var hdr=-1, col={};
+      for(var i=0;i<Math.min(rows.length,15);i++){
+        var m={};
+        (rows[i]||[]).forEach(function(v,c){
+          v=String(v||'');
+          if(/^s\/?n/i.test(v)) m.sn=c;
+          else if(/branch\s*code/i.test(v)) m.code=c;
+          else if(/branch\s*name|branchname/i.test(v)) m.name=c;
+          BR_CATS.forEach(function(cat){
+            if(EXP_COL[cat].test(v) && m[cat+'_exp']===undefined) m[cat+'_exp']=c;
+            else if(new RegExp(cat+'.*(number|no\\b)','i').test(v) && m[cat+'_no']===undefined) m[cat+'_no']=c;
+          });
+        });
+        if(m.name!==undefined && m.Commercial_exp!==undefined){ hdr=i; col=m; break; }
+      }
+      if(hdr<0) throw new Error('could not read the tracker headings');
+
+      // first free row after the last branch
+      var last=hdr;
+      for(var r2=hdr+1;r2<rows.length;r2++){
+        var key=(col.code!==undefined? rows[r2][col.code] : rows[r2][col.name]);
+        if(String(key==null?'':key).trim()!=='') last=r2;
+      }
+      var target=last+1;
+      var width=Math.max.apply(null,Object.keys(col).map(function(k){return col[k];}))+1;
+      var out=[]; for(var c2=0;c2<width;c2++) out.push('');
+      if(col.sn!==undefined) out[col.sn]=target-hdr;
+      if(col.code!==undefined) out[col.code]=code;
+      out[col.name]=name;
+      BR_CATS.forEach(function(cat){
+        var v=vals[cat], ec=col[cat+'_exp'], nc=col[cat+'_no'];
+        if(ec===undefined) return;
+        out[ec]= v.na? 'Not Applicable' : (v.date? dmy(v.date) : '');
+        if(nc!==undefined) out[nc]= v.na? '**' : (v.no||'');
+      });
+      var a1=(tab? "'"+tab.replace(/'/g,"''")+"'!" : '')+'A'+(target+1);
+      return fetch('https://sheets.googleapis.com/v4/spreadsheets/'+reg.id+'/values/'+
+                   encodeURIComponent(a1)+'?valueInputOption=USER_ENTERED',
+        {method:'PUT',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+         body:JSON.stringify({values:[out]})})
+        .then(function(r){
+          if(!r.ok) return r.text().then(function(x){ throw new Error(x.slice(0,140)); });
+          cb(true,'row '+(target+1)+' added — '+code+' / '+name);
+        });
+    })
+    .catch(function(e){ cb(false,e.message); });
+}
+
+function resetBranchForm(){
+  $('brCode').value=''; $('brName').value=''; BRF={};
+  BR_CATS.forEach(function(c){
+    $('br_'+c+'_exp').value=''; $('br_'+c+'_exp').disabled=false;
+    $('br_'+c+'_no').value=''; $('br_'+c+'_na').checked=false;
+    $('br_'+c+'_name').textContent='no file'; $('br_'+c+'_file').value='';
+  });
+}
+
 /* ============ wiring ============ */
 $('btnRefresh').onclick=function(){
   var t=$('btnRefresh'); t.className='tile busy';
@@ -2204,6 +2434,7 @@ $('upPick').onclick=function(){ $('upFile').click(); };
 $('upFile').onchange=function(e){ if(e.target.files[0]) upSetFile(e.target.files[0]); };
 $('btnUpload').onclick=doUpload;
 $('btnUpDownload').onclick=downloadRenamed;
+$('btnAddBranch').onclick=addBranch;
 (function(){
   var d=$('upDrop');
   ['dragenter','dragover'].forEach(function(ev){
