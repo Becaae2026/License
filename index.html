@@ -398,6 +398,30 @@ button{cursor:pointer}
 .cf-type input:focus{outline:2px solid var(--expired);outline-offset:-1px}
 .cf-warn{margin-top:12px;font-size:12.5px;color:var(--expired)}
 .cf-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  padding:20px;background:linear-gradient(140deg,var(--bec-dk) 0%,var(--bec) 55%,var(--bec-lt) 100%)}
+.gate-card{background:#fff;border-radius:18px;padding:34px 32px 26px;width:100%;max-width:380px;
+  box-shadow:0 24px 60px rgba(9,26,64,.4);display:flex;flex-direction:column;gap:11px}
+.gate-logo{height:42px;width:auto;align-self:center;margin-bottom:4px;
+  filter:brightness(0) saturate(100%) invert(18%) sepia(64%) saturate(1800%) hue-rotate(203deg)}
+.gate-card h1{font-family:"Archivo",sans-serif;font-size:19px;font-weight:800;margin:0;
+  text-align:center;color:var(--bec-dk);letter-spacing:-.01em}
+.gate-sub{margin:0 0 10px;text-align:center;font-family:"IBM Plex Mono",monospace;
+  font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3)}
+.gate-card label{display:flex;flex-direction:column;gap:6px;font-size:10.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--bec);font-family:"IBM Plex Mono",monospace;font-weight:600}
+.gate-card input{border:1px solid var(--rule);background:#fbfcff;border-radius:9px;padding:11px 13px;
+  font-size:14px;letter-spacing:0;text-transform:none;font-family:"IBM Plex Sans",sans-serif}
+.gate-card input:focus{outline:2px solid var(--bec-lt);outline-offset:-1px;background:#fff}
+.gate-btn{margin-top:8px;background:var(--bec);border:1px solid var(--bec);color:#fff;
+  border-radius:9px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;
+  transition:background .13s}
+.gate-btn:hover{background:var(--bec-lt)}
+.gate-btn:disabled{opacity:.6;cursor:default}
+.gate-err{background:#fff1f1;border:1px solid #f0a9a6;color:var(--expired);border-radius:8px;
+  padding:9px 12px;font-size:12.5px}
+.gate-note{margin:6px 0 0;font-size:11.5px;color:var(--ink-3);text-align:center;line-height:1.5}
+body.locked{overflow:hidden}
 .hide{display:none!important}
 
 @media(max-width:900px){
@@ -420,6 +444,19 @@ button{cursor:pointer}
 </head>
 <body>
 
+<div class="gate" id="gate">
+  <form class="gate-card" id="gateForm" autocomplete="on">
+    <img class="gate-logo" src="al-ansari-logo-white-100px.png" alt="Al Ansari Exchange">
+    <h1>License Expiry Control</h1>
+    <p class="gate-sub">AAE &amp; BEC &middot; Branch Network</p>
+    <label>Username<input type="text" id="gUser" autocomplete="username" required></label>
+    <label>Password<input type="password" id="gPass" autocomplete="current-password" required></label>
+    <button type="submit" class="gate-btn" id="gGo">Sign in</button>
+    <div class="gate-err hide" id="gErr"></div>
+    <p class="gate-note">Internal tool. Licence data is loaded from the company Drive folder.</p>
+  </form>
+</div>
+
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">
@@ -436,6 +473,9 @@ button{cursor:pointer}
       <button class="tile" id="btnPrint" title="Print the register">
         <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6h1a2 2 0 0 1 2 2v6h-4v4H7v-4H3v-6a2 2 0 0 1 2-2h1zm2 0h8V5H8v4zm1 8v4h6v-4H9z"/></svg>
         <span>Print</span></button>
+      <button class="tile ghost" id="btnSignOut" title="Sign out">
+        <svg viewBox="0 0 24 24"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3zm5.5 4.5-1.4 1.4L16.2 11H9v2h7.2l-2.1 2.1 1.4 1.4L20 12l-4.5-4.5z"/></svg>
+      </button>
       <button class="tile ghost" id="btnSettings" title="Drive connection">
         <svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4l2 1.6-1.6 2.8-2.4-.8a7.6 7.6 0 0 1-1.7 1l-.4 2.5h-3.2l-.4-2.5a7.6 7.6 0 0 1-1.7-1l-2.4.8L5.6 13.6 7.6 12l-2-1.6 1.6-2.8 2.4.8c.5-.4 1.1-.7 1.7-1l.4-2.5h3.2l.4 2.5c.6.3 1.2.6 1.7 1l2.4-.8 1.6 2.8L21 12z"/></svg>
       </button>
@@ -663,6 +703,111 @@ var DRIVE_API_KEY = 'AIzaSyBWotg6wY3dg3r3jyYDI9yLBzppdh804S4';   // Drive API, r
 var DRIVE_CLIENT_ID = '792209084342-dou7e5pirfd5e0trgqn012j8q1dthmk9.apps.googleusercontent.com';   // OAuth — needed to upload files and update the tracker
 var DRIVE_SHEET_ID  = '1oQSsreJJMjavvyZACGxkzs5u02IYoCr-ulPXx5n3fHI';   // the tracker Google Sheet (used even if it sits outside the folder)
 /* ===================================================================== */
+
+/* =====================================================================
+   SIGN-IN
+   Passwords are stored as SHA-256 of "username:password", never in clear.
+   To add or change a user, open the page with #hash on the end of the
+   address — it gives you the hash to paste here. Usernames are lower-case.
+   ===================================================================== */
+var USERS=[
+  {u:'admin', name:'Administrator',
+   h:'151df82663c773de8fe535c24c58d66cafb21b6159883b802d40eca5471aca28'},   // admin / bec2026
+  {u:'salih', name:'Salih',
+   h:'85677a5a749cc2e6be3035663a07c0e199386ad02070d75588e23105746d5d59'},   // salih / salih2026
+  {u:'aneesh', name:'Aneesh',
+   h:'eb7f26efe0b3f55141e77ad726fa91c8b60890481025da88c01ee3750dc62e7d'}    // aneesh
+];
+var SESSION_HOURS=8;
+/* ===================================================================== */
+
+var AUTH={user:null};
+
+function sha256(txt){
+  if(!(window.crypto && crypto.subtle))
+    return Promise.reject(new Error('This browser cannot hash passwords securely. Use a current browser over https.'));
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt))
+    .then(function(buf){
+      return Array.prototype.map.call(new Uint8Array(buf), function(b){
+        return ('0'+b.toString(16)).slice(-2);
+      }).join('');
+    });
+}
+function store(){ try{ return window.sessionStorage; }catch(e){ return null; } }
+function saveSession(u){
+  var s=store(); if(!s) return;
+  try{ s.setItem('bec_auth', JSON.stringify({u:u.u,name:u.name,exp:Date.now()+SESSION_HOURS*3600000})); }catch(e){}
+}
+function readSession(){
+  var s=store(); if(!s) return null;
+  try{
+    var j=JSON.parse(s.getItem('bec_auth')||'null');
+    if(j && j.exp>Date.now()) return j;
+    if(j) s.removeItem('bec_auth');
+  }catch(e){}
+  return null;
+}
+function signOut(){
+  var s=store(); if(s){ try{ s.removeItem('bec_auth'); }catch(e){} }
+  AUTH.user=null; UP.token=null; UP.expires=0;
+  location.reload();
+}
+function unlock(name){
+  AUTH.user=name;
+  $('gate').className='gate hide';
+  document.body.className='';
+  setStick();
+  if(!DRIVE.connected) maybeAutoConnectDrive();
+}
+
+function gateSubmit(e){
+  if(e) e.preventDefault();
+  var u=$('gUser').value.trim().toLowerCase(), p=$('gPass').value;
+  var err=$('gErr');
+  if(!u||!p){ err.className='gate-err'; err.textContent='Enter a username and password.'; return; }
+  $('gGo').disabled=true;
+  sha256(u+':'+p).then(function(hash){
+    var hit=USERS.filter(function(x){ return x.u===u && x.h===hash; })[0];
+    $('gGo').disabled=false;
+    if(!hit){
+      err.className='gate-err';
+      err.textContent='That username and password do not match.';
+      $('gPass').value=''; $('gPass').focus();
+      return;
+    }
+    err.className='gate-err hide';
+    saveSession(hit);
+    unlock(hit.name);
+  }).catch(function(ex){
+    $('gGo').disabled=false;
+    err.className='gate-err'; err.textContent=ex.message;
+  });
+}
+
+/* helper: open the page with #hash to work out a new password hash.
+   Renders inside the sign-in card so the rest of the page stays intact. */
+function hashHelper(){
+  if(location.hash!=='#hash') return false;
+  var card=$('gateForm');
+  card.innerHTML='<h1>Password hash</h1>'+
+    '<p class="gate-sub">for the USERS list in index.html</p>'+
+    '<label>Username<input type="text" id="hu" autocomplete="off"></label>'+
+    '<label>Password<input type="text" id="hp" autocomplete="off"></label>'+
+    '<pre id="ho" style="background:#f3f5fb;padding:12px;border-radius:9px;white-space:pre-wrap;'+
+    'font-family:IBM Plex Mono,monospace;font-size:11.5px;margin:10px 0 0;overflow-x:auto">&mdash;</pre>'+
+    '<p class="gate-note">Nothing leaves your browser. Remove #hash from the address to sign in.</p>';
+  card.onsubmit=function(e){ e.preventDefault(); };
+  var go=function(){
+    var u=($('hu').value||'').trim().toLowerCase(), pw=$('hp').value||'';
+    if(!u||!pw){ $('ho').textContent='—'; return; }
+    sha256(u+':'+pw).then(function(x){
+      $('ho').textContent="{u:'"+u+"', name:'"+u.charAt(0).toUpperCase()+u.slice(1)+"',\n h:'"+x+"'},";
+    }).catch(function(e){ $('ho').textContent=e.message; });
+  };
+  $('hu').oninput=go; $('hp').oninput=go;
+  document.body.className='locked';
+  return true;
+}
 
 /* ============ state ============ */
 var RAW = [];          // [{branch, area, type, number, rawDate}]
@@ -1962,8 +2107,6 @@ function driveFromHash(){
   }
 }
 driveFromHash();
-/* connect as soon as the page opens, if both values are present */
-setTimeout(maybeAutoConnectDrive,0);
 /* ============ tabs ============ */
 function showTab(name){
   document.querySelectorAll('.tab').forEach(function(t){
@@ -2344,14 +2487,17 @@ function brBadge(){
 }
 
 function addBranch(){
+  if($('btnAddBranch').disabled) return;
+  $('btnAddBranch').disabled=true;
+  var reEnable=function(){ $('btnAddBranch').disabled=false; };
   var code=$('brCode').value.trim().toUpperCase();
   var name=$('brName').value.trim();
-  if(!code){ brSay('Enter a branch code — it is used as the file name.','er'); return; }
-  if(!name){ brSay('Enter the branch name.','er'); return; }
+  if(!code){ brSay('Enter a branch code — it is used as the file name.','er'); reEnable(); return; }
+  if(!name){ brSay('Enter the branch name.','er'); reEnable(); return; }
   var clash=ROWS.filter(function(r){
     return String(r.code||'').toUpperCase()===code ||
            r.branch.toUpperCase()===name.toUpperCase(); })[0];
-  if(clash){ brSay('"'+code+' / '+name+'" already exists in the tracker as "'+clash.branch+'". Use the Upload licence tab instead.','er'); return; }
+  if(clash){ brSay('"'+code+' / '+name+'" already exists in the tracker as "'+clash.branch+'". Use the Upload licence tab instead.','er'); reEnable(); return; }
 
   var vals={};
   for(var i=0;i<BR_CATS.length;i++){
@@ -2360,25 +2506,24 @@ function addBranch(){
     var raw=$('br_'+c+'_exp').value.trim();
     if(!raw){ vals[c]={blank:true}; continue; }
     var d=parseDate(raw);
-    if(!d){ brSay(c+' expiry "'+raw+'" is not a date I can read — use dd/mm/yyyy.','er'); return; }
+    if(!d){ brSay(c+' expiry "'+raw+'" is not a date I can read — use dd/mm/yyyy.','er'); reEnable(); return; }
     vals[c]={date:d,no:$('br_'+c+'_no').value.trim()};
   }
 
   upToken(function(tok,err){
     if(!tok){
       brSay(err==='no-client'? 'Adding a branch writes to the tracker, which needs sign-in. Add an OAuth client ID under the gear icon.' : err,'er');
-      return;
+      reEnable(); return;
     }
     brBadge();
-    $('btnAddBranch').disabled=true;
     brSay('Adding '+code+' — '+name+' to the tracker …');
     sheetAddRow(code,name,vals,tok,function(ok,msg){
       if(!ok){ brSay('Tracker not updated: '+msg,'er'); $('btnAddBranch').disabled=false; return; }
       brSay('Tracker: '+msg,'ok');
+      resetBranchForm();                       // clear at once so a stray click cannot repeat it
       uploadBranchFiles(code,tok,function(){
         brSay('Done. Reloading from Drive …','ok');
-        $('btnAddBranch').disabled=false;
-        setTimeout(function(){ driveConnect(); resetBranchForm(); }, 900);
+        setTimeout(function(){ driveConnect(); $('btnAddBranch').disabled=false; }, 900);
       });
     });
   });
@@ -2437,6 +2582,15 @@ function sheetAddRow(code,name,vals,tok,cb){
         if(m.name!==undefined && m.Commercial_exp!==undefined){ hdr=i; col=m; break; }
       }
       if(hdr<0) throw new Error('could not read the tracker headings');
+
+      // guard against a double click adding the same branch twice
+      for(var dup=hdr+1;dup<rows.length;dup++){
+        var dc=col.code!==undefined? String(rows[dup][col.code]||'').trim():'';
+        var dn=String(rows[dup][col.name]||'').trim();
+        if((code && dc.toUpperCase()===code.toUpperCase()) ||
+           dn.toUpperCase()===name.toUpperCase())
+          throw new Error(code+' is already in the tracker on row '+(dup+1)+' — nothing was added');
+      }
 
       // first free row after the last branch
       var last=hdr;
@@ -2603,15 +2757,18 @@ function sheetDeleteRow(row,tok,cb){
         if(seen && (cc>=0||nc>=0)){ hdr=i; codeC=cc; nameC=nc; break; }
       }
       if(hdr<0) throw new Error('could not read the tracker headings');
-      var target=-1, hits=0;
+      var found=[];
       for(var r2=hdr+1;r2<rows.length;r2++){
         var cv=codeC>=0? String(rows[r2][codeC]||'').trim():'';
         var nv=nameC>=0? String(rows[r2][nameC]||'').trim():'';
         if((code && cv.toUpperCase()===code.toUpperCase()) ||
-           (!code && nv.toUpperCase()===row.branch.toUpperCase())){ if(target<0) target=r2; hits++; }
+           (!code && nv.toUpperCase()===row.branch.toUpperCase())) found.push(r2);
       }
-      if(target<0) throw new Error('could not find '+(code||row.branch)+' in the tracker');
-      if(hits>1) throw new Error((code||row.branch)+' appears '+hits+' times in the tracker — tidy it up first so the right row is removed');
+      if(!found.length) throw new Error('could not find '+(code||row.branch)+' in the tracker');
+      if(found.length>1)
+        throw new Error((code||row.branch)+' appears on rows '+found.map(function(x){return x+1;}).join(' and ')+
+          ' of "'+tab+'". Open the Sheet, delete the extra row, then press Reload and try again.');
+      var target=found[0];
       return fetch('https://sheets.googleapis.com/v4/spreadsheets/'+reg.id+':batchUpdate',
         {method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
          body:JSON.stringify({requests:[{deleteDimension:{range:{
@@ -2625,6 +2782,18 @@ function sheetDeleteRow(row,tok,cb){
 }
 
 /* ============ wiring ============ */
+$('btnSignOut').onclick=function(){
+  if(confirm('Sign out of the licence dashboard?')) signOut();
+};
+
+/* boot: password helper, saved session, or the sign-in screen */
+if(!hashHelper()){
+  $('gateForm').onsubmit=gateSubmit;
+  var sess=readSession();
+  if(sess) unlock(sess.name);
+  else { document.body.className='locked'; setTimeout(function(){ $('gUser').focus(); },60); }
+}
+
 $('btnRefresh').onclick=function(){
   var t=$('btnRefresh'); t.className='tile busy';
   driveConnect();
