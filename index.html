@@ -755,9 +755,22 @@ var USERS=[
   {u:'aneesh', name:'Aneesh', role:'admin',
    h:'eb7f26efe0b3f55141e77ad726fa91c8b60890481025da88c01ee3750dc62e7d'}
 ];
-var USER_TAB='Users';      // tab in the tracker Sheet holding accounts added later
-var SHEET_USERS=[];        // loaded from that tab at start-up
-function allUsers(){ return USERS.concat(SHEET_USERS); }
+var USER_TAB='Users';      // tab in the tracker Sheet holding account changes
+var SHEET_USERS=[];        // accounts added or overridden there
+var DISABLED=[];           // built-in accounts switched off there
+function allUsers(){
+  var out=USERS.filter(function(b){
+    if(DISABLED.indexOf(b.u)>=0) return false;
+    return !SHEET_USERS.filter(function(s){return s.u===b.u;})[0];
+  }).map(function(b){
+    var c={}; for(var k in b) c[k]=b[k]; c.builtin=true; return c;
+  });
+  return out.concat(SHEET_USERS.map(function(s){
+    var c={}; for(var k in s) c[k]=s[k];
+    c.overrides = !!USERS.filter(function(b){return b.u===s.u;})[0];
+    return c;
+  })).sort(function(a,b){ return a.u.localeCompare(b.u); });
+}
 var SESSION_HOURS=8;
 /* ===================================================================== */
 
@@ -2839,12 +2852,17 @@ function loadSheetUsers(after){
     .then(function(r){ return r.ok? r.json() : null; })
     .then(function(j){
       var rows=(j&&j.values)||[];
+      DISABLED=[];
       rows.forEach(function(r,i){
         if(i===0 && /user/i.test(String(r[0]||''))) return;      // header
         var u=String(r[0]||'').trim().toLowerCase();
+        if(!u) return;
+        var role=String(r[2]||'user').trim().toLowerCase();
+        if(role==='disabled'){ DISABLED.push(u); return; }
         var hsh=String(r[3]||'').trim().toLowerCase();
-        if(!u||hsh.length!==64) return;
-        SHEET_USERS.push({u:u, name:String(r[1]||u).trim(), role:(String(r[2]||'user').trim().toLowerCase()==='admin'?'admin':'user'), h:hsh, sheet:true});
+        if(hsh.length!==64) return;
+        SHEET_USERS.push({u:u, name:String(r[1]||u).trim(),
+                          role:(role==='admin'?'admin':'user'), h:hsh, sheet:true});
       });
     })
     .catch(function(){})
@@ -2874,27 +2892,26 @@ function renderUsers(){
     var tr=document.createElement('tr');
     tr.innerHTML='<td class="mono">'+esc(u.u)+'</td><td>'+esc(u.name)+'</td>'+
       '<td>'+(u.role==='admin'? '<span class="pill good">admin</span>':'<span class="pill maybe">user</span>')+'</td>'+
-      '<td class="mono" style="font-size:11px;color:var(--ink-3)">'+(u.sheet?'Sheet':'built into the page')+'</td>';
+      '<td class="mono" style="font-size:11px;color:var(--ink-3)">'+
+      (u.overrides? 'Sheet (replaces index.html)' : u.sheet? 'Sheet' : 'index.html')+'</td>';
     var td=document.createElement('td'); td.style.whiteSpace='nowrap';
-    if(u.sheet){
-      var e=document.createElement('button');
-      e.className='btn ghost'; e.style.padding='4px 10px'; e.style.marginRight='6px'; e.textContent='Edit';
-      e.onclick=function(){ startEdit(u); };
-      td.appendChild(e);
-      if(u.u!==AUTH.uname){
-        var b=document.createElement('button');
-        b.className='btn danger-btn'; b.style.padding='4px 10px'; b.textContent='Delete';
-        b.onclick=function(){
-          if(confirm('Delete the account "'+u.u+'" ('+u.name+')?\n\nThey will no longer be able to sign in.'))
-            removeUser(u.u);
-        };
-        td.appendChild(b);
-      } else {
-        var s=document.createElement('span'); s.className='cell-empty'; s.textContent='signed in';
-        td.appendChild(s);
-      }
+    var e=document.createElement('button');
+    e.className='btn ghost'; e.style.padding='4px 10px'; e.style.marginRight='6px'; e.textContent='Edit';
+    e.onclick=function(){ startEdit(u); };
+    td.appendChild(e);
+    if(u.u!==AUTH.uname){
+      var b=document.createElement('button');
+      b.className='btn danger-btn'; b.style.padding='4px 10px'; b.textContent='Delete';
+      b.onclick=function(){
+        var extra = u.builtin? '\n\nThis account is written into index.html, so it will be switched off '+
+          'through the Users tab rather than erased. Removing its line from the file makes that permanent.' : '';
+        if(confirm('Delete the account "'+u.u+'" ('+u.name+')?\n\nThey will no longer be able to sign in.'+extra))
+          removeUser(u.u, u.builtin);
+      };
+      td.appendChild(b);
     } else {
-      td.innerHTML='<span class="cell-empty">'+(u.u===AUTH.uname? 'you · in index.html' : 'in index.html')+'</span>';
+      var s=document.createElement('span'); s.className='cell-empty'; s.textContent='signed in';
+      td.appendChild(s);
     }
     tr.appendChild(td); body.appendChild(tr);
   });
@@ -2924,9 +2941,11 @@ function cancelEdit(){
 
 function usersRange(){ return "'"+USER_TAB.replace(/'/g,"''")+"'!A1:D"; }
 
-function writeUsers(list,tok,cb){
+function writeUsers(list,tok,cb,disabled){
+  var dis = disabled || DISABLED;
   var rows=[['Username','Display name','Role','Password hash']];
   list.forEach(function(u){ rows.push([u.u,u.name,u.role,u.h]); });
+  dis.forEach(function(u){ rows.push([u,'(switched off)','disabled','']); });
   for(var i=0;i<6;i++) rows.push(['','','','']);       // clear any removed rows
   ensureUserTab(tok,function(ok,msg){
     if(!ok){ cb(false,msg); return; }
@@ -2964,13 +2983,10 @@ function saveUser(){
   var role=$('usRole').value;
   var pw=$('usPass').value;
   var editing=US_EDIT;
-  var before=editing? SHEET_USERS.filter(function(x){return x.u===editing;})[0] : null;
+  var before=editing? allUsers().filter(function(x){return x.u===editing;})[0] : null;
 
   if(!/^[a-z0-9._-]{3,20}$/.test(u)){ usSay('Username must be 3–20 characters — letters, numbers, dot, dash or underscore.','er'); return; }
-  if(USERS.filter(function(x){return x.u===u;})[0]){
-    usSay('"'+u+'" is built into index.html — pick a different username, or change it in the file.','er'); return;
-  }
-  var taken=SHEET_USERS.filter(function(x){return x.u===u && x.u!==editing;})[0];
+  var taken=allUsers().filter(function(x){return x.u===u && x.u!==editing;})[0];
   if(taken){ usSay('"'+u+'" is already taken by '+taken.name+'.','er'); return; }
   if(!editing && pw.length<8){ usSay('Password must be at least 8 characters.','er'); return; }
   if(editing && pw && pw.length<8){ usSay('Password must be at least 8 characters, or leave it blank to keep the current one.','er'); return; }
@@ -2982,6 +2998,10 @@ function saveUser(){
   var apply=function(hash){
     var list=SHEET_USERS.slice().filter(function(x){ return x.u!==u && x.u!==editing; });
     list.push({u:u,name:nm,role:role,h:hash,sheet:true});
+    // renaming a built-in leaves the old name behind in the file, so switch it off
+    var wasBuiltin = editing && USERS.filter(function(x){return x.u===editing;})[0];
+    var dis = DISABLED.filter(function(d){ return d!==u; });
+    if(wasBuiltin && editing!==u && dis.indexOf(editing)<0) dis.push(editing);
     list.sort(function(a,b){return a.u.localeCompare(b.u);});
     $('btnSaveUser').disabled=true;
     upToken(function(tok,err){
@@ -2991,14 +3011,14 @@ function saveUser(){
       writeUsers(list,tok,function(ok,msg){
         $('btnSaveUser').disabled=false;
         if(!ok){ usSay('Not saved: '+msg,'er'); return; }
-        SHEET_USERS=list;
+        SHEET_USERS=list; DISABLED=dis;
         if(editing && editing!==u) usSay('Renamed "'+editing+'" to "'+u+'".','ok');
         else if(editing) usSay('Updated "'+u+'"'+(pw? ' (new password set)':'')+'.','ok');
         else usSay('Added "'+u+'" as '+role+'.','ok');
         if(editing===AUTH.uname && editing!==u)
           usSay('That was your own account — sign in again as "'+u+'" next time.','er');
         cancelEdit(); renderUsers();
-      });
+      },dis);
     });
   };
 
@@ -3012,14 +3032,22 @@ function saveUser(){
   }
 }
 
-function removeUser(u){
+function removeUser(u,builtin){
+  if(allUsers().filter(function(x){return x.role==='admin';}).length<=1 &&
+     allUsers().filter(function(x){return x.u===u;})[0].role==='admin'){
+    usSay('That is the only admin account — make someone else an admin first.','er'); return;
+  }
   upToken(function(tok,err){
     if(!tok){ usSay(err==='no-client'? 'Removing an account writes to the Sheet, which needs Google sign-in.' : err,'er'); return; }
     var list=SHEET_USERS.filter(function(x){return x.u!==u;});
+    var dis=DISABLED.slice();
+    if(builtin && dis.indexOf(u)<0) dis.push(u);
     writeUsers(list,tok,function(ok,msg){
       if(!ok){ usSay('Not removed: '+msg,'er'); return; }
-      SHEET_USERS=list; usSay('Deleted "'+u+'".','ok'); if(US_EDIT===u) cancelEdit(); renderUsers();
-    });
+      SHEET_USERS=list; DISABLED=dis;
+      usSay('Deleted "'+u+'".'+(builtin? ' Remove its line from index.html to make that permanent.':''),'ok');
+      if(US_EDIT===u) cancelEdit(); renderUsers();
+    },dis);
   });
 }
 
