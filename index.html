@@ -650,12 +650,12 @@ body.locked{overflow:hidden}
       </tr></thead><tbody id="usBody"></tbody></table></div>
 
       <div class="panel-head" style="border-top:1px solid var(--rule-soft);border-bottom:0">
-        <div><h2 style="font-size:14px">Add or update an account</h2>
-        <span class="sub">Using an existing username replaces that account&rsquo;s password.</span></div>
+        <div><h2 style="font-size:14px" id="usFormTitle">Add an account</h2>
+        <span class="sub" id="usFormSub">Usernames may be changed later without losing the password.</span></div>
       </div>
       <div class="up-form">
-        <label>Username<input type="text" id="usUser" placeholder="e.g. priya" autocomplete="off"></label>
-        <label>Display name<input type="text" id="usName" placeholder="e.g. Priya" autocomplete="off"></label>
+        <label>Username<input type="text" id="usUser" placeholder="e.g. aneesh" autocomplete="off"></label>
+        <label>Display name<input type="text" id="usName" placeholder="e.g. Aneesh" autocomplete="off"></label>
         <label>Role
           <select id="usRole"><option value="user">User</option><option value="admin">Admin</option></select>
         </label>
@@ -663,8 +663,9 @@ body.locked{overflow:hidden}
       </div>
       <div class="up-actions">
         <button class="btn btn-solid" id="btnSaveUser">Save account</button>
+        <button class="btn ghost hide" id="btnCancelEdit">Cancel</button>
         <span class="spacer"></span>
-        <span class="sub">Admins can manage users and branches. Users see the dashboard and can upload licences.</span>
+        <span class="sub">Admins manage users and branches. Users see the dashboard and can upload licences.</span>
       </div>
       <div class="up-log hide" id="usLog"></div>
     </div>
@@ -2160,7 +2161,7 @@ function showTab(name){
   $('uploadTab').className = name==='upload' ? '' : 'hide';
   $('branchTab').className = name==='branch' ? '' : 'hide';
   $('usersTab').className = name==='users' ? '' : 'hide';
-  if(name==='users'){ renderUsers(); usBadge(); }
+  if(name==='users'){ cancelEdit(); renderUsers(); usBadge(); }
   if(name==='upload'){ fillUploadBranches(); upBadge(); }
   if(name==='branch'){ buildBranchGrid(); brBadge(); fillDeleteBranches(); }
 }
@@ -2874,19 +2875,51 @@ function renderUsers(){
     tr.innerHTML='<td class="mono">'+esc(u.u)+'</td><td>'+esc(u.name)+'</td>'+
       '<td>'+(u.role==='admin'? '<span class="pill good">admin</span>':'<span class="pill maybe">user</span>')+'</td>'+
       '<td class="mono" style="font-size:11px;color:var(--ink-3)">'+(u.sheet?'Sheet':'built into the page')+'</td>';
-    var td=document.createElement('td');
-    if(u.sheet && u.u!==AUTH.uname){
-      var b=document.createElement('button');
-      b.className='btn danger-btn'; b.style.padding='4px 10px'; b.textContent='Remove';
-      b.onclick=function(){
-        if(confirm('Remove the account "'+u.u+'"? They will not be able to sign in.')) removeUser(u.u);
-      };
-      td.appendChild(b);
+    var td=document.createElement('td'); td.style.whiteSpace='nowrap';
+    if(u.sheet){
+      var e=document.createElement('button');
+      e.className='btn ghost'; e.style.padding='4px 10px'; e.style.marginRight='6px'; e.textContent='Edit';
+      e.onclick=function(){ startEdit(u); };
+      td.appendChild(e);
+      if(u.u!==AUTH.uname){
+        var b=document.createElement('button');
+        b.className='btn danger-btn'; b.style.padding='4px 10px'; b.textContent='Delete';
+        b.onclick=function(){
+          if(confirm('Delete the account "'+u.u+'" ('+u.name+')?\n\nThey will no longer be able to sign in.'))
+            removeUser(u.u);
+        };
+        td.appendChild(b);
+      } else {
+        var s=document.createElement('span'); s.className='cell-empty'; s.textContent='signed in';
+        td.appendChild(s);
+      }
     } else {
-      td.innerHTML='<span class="cell-empty">'+(u.u===AUTH.uname? 'you' : 'edit in index.html')+'</span>';
+      td.innerHTML='<span class="cell-empty">'+(u.u===AUTH.uname? 'you · in index.html' : 'in index.html')+'</span>';
     }
     tr.appendChild(td); body.appendChild(tr);
   });
+}
+
+var US_EDIT=null;      // username being edited, null when adding
+
+function startEdit(u){
+  US_EDIT=u.u;
+  $('usUser').value=u.u; $('usName').value=u.name; $('usRole').value=u.role; $('usPass').value='';
+  $('usFormTitle').textContent='Edit "'+u.u+'"';
+  $('usFormSub').textContent='Change the username, display name or role. Leave the password blank to keep the current one.';
+  $('usPass').placeholder='leave blank to keep current password';
+  $('btnSaveUser').textContent='Save changes';
+  $('btnCancelEdit').className='btn ghost';
+  $('usUser').focus();
+}
+function cancelEdit(){
+  US_EDIT=null;
+  $('usUser').value=''; $('usName').value=''; $('usPass').value=''; $('usRole').value='user';
+  $('usFormTitle').textContent='Add an account';
+  $('usFormSub').textContent='Usernames may be changed later without losing the password.';
+  $('usPass').placeholder='min 8 characters';
+  $('btnSaveUser').textContent='Save account';
+  $('btnCancelEdit').className='btn ghost hide';
 }
 
 function usersRange(){ return "'"+USER_TAB.replace(/'/g,"''")+"'!A1:D"; }
@@ -2930,37 +2963,62 @@ function saveUser(){
   var nm=$('usName').value.trim() || u;
   var role=$('usRole').value;
   var pw=$('usPass').value;
-  if(!/^[a-z0-9._-]{3,20}$/.test(u)){ usSay('Username must be 3–20 characters, letters and numbers only.','er'); return; }
-  if(pw.length<8){ usSay('Password must be at least 8 characters.','er'); return; }
-  var builtin=USERS.filter(function(x){return x.u===u;})[0];
-  if(builtin){ usSay('"'+u+'" is built into index.html — change it there, or pick a different username.','er'); return; }
+  var editing=US_EDIT;
+  var before=editing? SHEET_USERS.filter(function(x){return x.u===editing;})[0] : null;
 
-  upToken(function(tok,err){
-    if(!tok){ usSay(err==='no-client'? 'Saving an account writes to the Sheet, which needs Google sign-in.' : err,'er'); return; }
-    usBadge();
-    sha256(u+':'+pw).then(function(hash){
-      var list=SHEET_USERS.slice().filter(function(x){return x.u!==u;});
-      list.push({u:u,name:nm,role:role,h:hash,sheet:true});
-      list.sort(function(a,b){return a.u.localeCompare(b.u);});
-      $('btnSaveUser').disabled=true;
+  if(!/^[a-z0-9._-]{3,20}$/.test(u)){ usSay('Username must be 3–20 characters — letters, numbers, dot, dash or underscore.','er'); return; }
+  if(USERS.filter(function(x){return x.u===u;})[0]){
+    usSay('"'+u+'" is built into index.html — pick a different username, or change it in the file.','er'); return;
+  }
+  var taken=SHEET_USERS.filter(function(x){return x.u===u && x.u!==editing;})[0];
+  if(taken){ usSay('"'+u+'" is already taken by '+taken.name+'.','er'); return; }
+  if(!editing && pw.length<8){ usSay('Password must be at least 8 characters.','er'); return; }
+  if(editing && pw && pw.length<8){ usSay('Password must be at least 8 characters, or leave it blank to keep the current one.','er'); return; }
+  if(editing && before && before.u===AUTH.uname && role!=='admin' &&
+     allUsers().filter(function(x){return x.role==='admin';}).length<=1){
+    usSay('You are the only admin — keep this account an admin, or make someone else one first.','er'); return;
+  }
+
+  var apply=function(hash){
+    var list=SHEET_USERS.slice().filter(function(x){ return x.u!==u && x.u!==editing; });
+    list.push({u:u,name:nm,role:role,h:hash,sheet:true});
+    list.sort(function(a,b){return a.u.localeCompare(b.u);});
+    $('btnSaveUser').disabled=true;
+    upToken(function(tok,err){
+      if(!tok){ $('btnSaveUser').disabled=false;
+        usSay(err==='no-client'? 'Saving an account writes to the Sheet, which needs Google sign-in.' : err,'er'); return; }
+      usBadge();
       writeUsers(list,tok,function(ok,msg){
         $('btnSaveUser').disabled=false;
         if(!ok){ usSay('Not saved: '+msg,'er'); return; }
         SHEET_USERS=list;
-        usSay('Saved "'+u+'" as '+role+'.','ok');
-        $('usUser').value=''; $('usName').value=''; $('usPass').value='';
-        renderUsers();
+        if(editing && editing!==u) usSay('Renamed "'+editing+'" to "'+u+'".','ok');
+        else if(editing) usSay('Updated "'+u+'"'+(pw? ' (new password set)':'')+'.','ok');
+        else usSay('Added "'+u+'" as '+role+'.','ok');
+        if(editing===AUTH.uname && editing!==u)
+          usSay('That was your own account — sign in again as "'+u+'" next time.','er');
+        cancelEdit(); renderUsers();
       });
     });
-  });
+  };
+
+  if(pw) sha256(u+':'+pw).then(apply).catch(function(e){ usSay(e.message,'er'); });
+  else if(editing && before){
+    if(u!==editing){
+      usSay('Changing the username also changes how the password is stored, so a new password is required.','er');
+      $('usPass').focus(); return;
+    }
+    apply(before.h);
+  }
 }
+
 function removeUser(u){
   upToken(function(tok,err){
     if(!tok){ usSay(err==='no-client'? 'Removing an account writes to the Sheet, which needs Google sign-in.' : err,'er'); return; }
     var list=SHEET_USERS.filter(function(x){return x.u!==u;});
     writeUsers(list,tok,function(ok,msg){
       if(!ok){ usSay('Not removed: '+msg,'er'); return; }
-      SHEET_USERS=list; usSay('Removed "'+u+'".','ok'); renderUsers();
+      SHEET_USERS=list; usSay('Deleted "'+u+'".','ok'); if(US_EDIT===u) cancelEdit(); renderUsers();
     });
   });
 }
@@ -3001,6 +3059,7 @@ $('btnUpload').onclick=doUpload;
 $('btnUpDownload').onclick=downloadRenamed;
 $('btnAddBranch').onclick=addBranch;
 $('btnSaveUser').onclick=saveUser;
+$('btnCancelEdit').onclick=cancelEdit;
 $('delBranch').onchange=delSummary;
 $('btnDelBranch').onclick=openConfirm;
 $('cfCancel').onclick=closeConfirm;
