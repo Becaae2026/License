@@ -2,9 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#144194">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Licences">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>AAE &amp; BEC — Branch License Expiry Control</title>
-<link rel="icon" href="BEC_logo.png">
+<link rel="icon" type="image/png" href="favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -422,6 +429,69 @@ button{cursor:pointer}
   padding:9px 12px;font-size:12.5px}
 .gate-note{margin:6px 0 0;font-size:11.5px;color:var(--ink-3);text-align:center;line-height:1.5}
 body.locked{overflow:hidden}
+@media(max-width:760px){
+  .wrap{padding:0 12px 90px}
+  .topbar-in{padding:10px 12px;gap:10px;align-items:center}
+  .brand{gap:8px}
+  .brand .logo.aae{height:30px} .brand .logo.bec{height:19px} .brand .amp{font-size:12px}
+  .brand-txt{padding-left:10px;margin-left:0}
+  .brand h1{font-size:16px} .brand .eyebrow{font-size:8.5px;letter-spacing:.14em;margin-bottom:4px}
+  .tools{gap:6px}
+  .tile{min-width:0;padding:7px 9px;font-size:0;gap:0}
+  .tile svg{width:19px;height:19px}
+  .tile span{display:none}
+
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-top:14px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:9px 13px;font-size:13px;white-space:nowrap}
+
+  .kpis{grid-template-columns:repeat(2,1fr);gap:9px}
+  .kpi{padding:12px 13px 11px;border-radius:12px}
+  .kpi .n{font-size:28px} .kpi .l{font-size:9.5px;letter-spacing:.09em;margin-top:5px}
+  .kpi::after{width:80px;height:80px;right:-18px;top:-24px}
+
+  .runway{height:112px;gap:3px;padding:16px 12px 0}
+  .rw-axis{gap:3px;padding:7px 12px 12px}
+  .rw-lab{font-size:8px} .rw-count{font-size:10px;height:16px}
+  .panel-head{padding:12px 14px 10px}
+  .panel-head h2{font-size:14px}
+
+  .filters{gap:6px}
+  .filters input[type=search]{min-width:0;flex:1 1 100%}
+  .filters select,.filters .btn{flex:1 1 46%;padding:8px 10px;font-size:12.5px}
+
+  /* the licence matrix becomes one card per branch */
+  .mtx,.mtx thead,.mtx tbody,.mtx tr,.mtx td{display:block;width:100%}
+  .mtx{border:0;background:transparent;box-shadow:none;margin-top:10px}
+  .mtx thead{display:none}
+  .mtx tbody tr{background:var(--card);border:1px solid var(--rule-soft);border-radius:12px;
+    box-shadow:var(--shadow);margin-bottom:10px;padding:4px 0 8px;position:relative;overflow:hidden}
+  .mtx tbody tr:nth-child(even) td,.mtx tbody tr:hover td{background:transparent}
+  .mtx td{border-bottom:0;padding:5px 14px 5px 16px}
+  .mtx td.rowbar{position:absolute;left:0;top:0;bottom:0;width:5px;height:auto;padding:0!important}
+  .mtx td[data-label]:before{content:attr(data-label);display:block;
+    font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+  .mtx td[data-label]{display:flex;flex-direction:column;border-top:1px solid var(--rule-soft);
+    padding-top:8px;margin-top:4px}
+  .mtx td:nth-child(2){padding-top:10px}
+  .br-name{font-size:15px}
+  .cell-date{display:inline-block;margin-right:8px}
+
+  .up-form,.drive-form{padding:12px 14px 4px}
+  .up-form label,.drive-form label{min-width:0;flex:1 1 100%}
+  .up-actions,.scan-actions,.conn-row{padding:12px 14px}
+  .up-actions .btn,.scan-actions .btn{flex:1 1 auto}
+  .up-actions .sub,.scan-actions .sub{flex:1 1 100%}
+  .br-grid{padding:4px 14px}
+  .modal{padding:20px 18px}
+  .gate-card{padding:26px 22px 20px}
+  .foot{font-size:11px}
+}
+@media(max-width:380px){
+  .kpis{grid-template-columns:1fr}
+  .brand .eyebrow{display:none}
+}
 .hide{display:none!important}
 
 @media(max-width:900px){
@@ -1210,6 +1280,7 @@ function renderMatrix(){
     tr.appendChild(td);
     TYPES.forEach(function(t){
       var c=r.cells[t], cell=document.createElement('td');
+      cell.setAttribute('data-label',t);
       if(!c){ cell.innerHTML='<span class="cell-empty">—</span>'; }
       else if(c.na){
         cell.innerHTML='<span class="tag t-na">not applicable</span>';
@@ -3063,6 +3134,12 @@ if(!hashHelper()){
     var sess=readSession();
     if(sess) unlock(sess.name, sess.role, sess.u);
     else { document.body.className='locked'; setTimeout(function(){ $('gUser').focus(); },60); }
+  });
+}
+
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
   });
 }
 
