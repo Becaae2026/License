@@ -492,6 +492,35 @@ body.locked{overflow:hidden}
   .kpis{grid-template-columns:1fr}
   .brand .eyebrow{display:none}
 }
+.rn-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 18px 4px}
+.rn-kpi{border:1px solid var(--rule-soft);background:#fbfcff;border-radius:11px;padding:11px 14px;
+  text-align:left;cursor:pointer;transition:border-color .13s,background .13s}
+.rn-kpi:hover{border-color:var(--bec-lt)}
+.rn-kpi.on{border-color:var(--valid);background:#eefaf4;box-shadow:inset 0 0 0 1px var(--valid)}
+.rn-kpi .n{display:block;font-family:"Archivo",sans-serif;font-weight:800;font-size:24px;
+  letter-spacing:-.03em;color:var(--valid);line-height:1}
+.rn-kpi .l{display:block;margin-top:5px;font-family:"IBM Plex Mono",monospace;font-size:10px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.rn-filters{padding:8px 18px 12px;margin-top:0}
+.rn-filters .spacer{flex:1}
+.rn-table td{vertical-align:middle;white-space:nowrap}
+.rn-table td.rn-br{white-space:normal;min-width:150px}
+.rn-table .old{color:var(--ink-3);text-decoration:line-through;text-decoration-color:rgba(131,144,173,.6)}
+.rn-plus{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--valid)}
+.rn-kind{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);display:block;margin-top:2px}
+.rn-empty{padding:30px 18px;text-align:center;color:var(--ink-3);font-size:13px;white-space:normal!important}
+.rn-foot{padding:10px 18px 14px;margin-top:0}
+@media(max-width:760px){
+  .rn-kpis{grid-template-columns:repeat(2,1fr);padding:12px 14px 4px}
+  .rn-filters{padding:8px 14px 12px}
+  .rn-table,.rn-table thead,.rn-table tbody,.rn-table tr,.rn-table td{display:block;width:100%}
+  .rn-table thead{display:none}
+  .rn-table tbody tr{border-top:1px solid var(--rule-soft);padding:10px 14px}
+  .rn-table td{border:0;padding:2px 0;white-space:normal}
+  .rn-table td[data-l]:before{content:attr(data-l)': ';font-family:"IBM Plex Mono",monospace;
+    font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+}
 .hide{display:none!important}
 
 @media(max-width:900px){
@@ -592,6 +621,7 @@ body.locked{overflow:hidden}
   <div class="tabs hide" id="tabs">
     <button class="tab on" data-tab="dash">Dashboard</button>
     <button class="tab" data-tab="upload">Upload licence</button>
+    <button class="tab" data-tab="renew">Renewals</button>
     <button class="tab" data-tab="branch">Manage branches</button>
     <button class="tab hide" data-tab="users">Users</button>
   </div>
@@ -705,6 +735,42 @@ body.locked{overflow:hidden}
     </div>
   </div>
 
+  <section id="renewTab" class="hide">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Renewed licences</h2>
+          <span class="sub">Every licence renewed through the Upload licence tab &mdash; newest first. Kept on the &ldquo;Renewals&rdquo; tab of the tracker Sheet.</span>
+        </div>
+        <span class="pill good" id="rnBadge">0 renewals</span>
+      </div>
+      <div class="rn-kpis">
+        <button class="rn-kpi" data-days="30"><span class="n" id="rn30">0</span><span class="l">Last 30 days</span></button>
+        <button class="rn-kpi" data-days="90"><span class="n" id="rn90">0</span><span class="l">Last 90 days</span></button>
+        <button class="rn-kpi" data-days="365"><span class="n" id="rn365">0</span><span class="l">Last 12 months</span></button>
+        <button class="rn-kpi on" data-days="0"><span class="n" id="rnAll">0</span><span class="l">All time</span></button>
+      </div>
+      <div class="filters rn-filters">
+        <input type="search" id="rnQ" placeholder="Search branch, code or licence number">
+        <select id="rnType">
+          <option value="">All licence types</option>
+          <option>Commercial</option><option>Fire</option><option>Signboard</option>
+        </select>
+        <select id="rnKind">
+          <option value="renewed">Renewals only</option>
+          <option value="">Include copy replacements</option>
+        </select>
+        <span class="spacer"></span>
+        <button class="btn" id="btnRnExport">Export CSV</button>
+      </div>
+      <div style="overflow-x:auto"><table class="mini rn-table"><thead><tr>
+        <th>Renewed on</th><th>Branch</th><th>Licence</th><th>Previous expiry</th>
+        <th>New expiry</th><th>Extended by</th><th>Renewed by</th><th>Copy</th>
+      </tr></thead><tbody id="rnBody"></tbody></table></div>
+      <div class="foot rn-foot"><span id="rnCount"></span><span id="rnSrc"></span></div>
+    </div>
+  </section>
+
   <section id="usersTab" class="hide">
     <div class="panel">
       <div class="panel-head">
@@ -783,6 +849,7 @@ body.locked{overflow:hidden}
       </select>
       <button class="chip-clear hide" id="clearFilters">Clear filters</button>
       <span class="spacer"></span>
+      <button class="btn" id="btnGoRenew">View renewals</button>
       <button class="btn" id="btnCopies">Download copies (view)</button>
       <button class="btn" id="btnExport">Export current view</button>
     </div>
@@ -1106,7 +1173,7 @@ function ingest(rows, source){
   $('parseWarn').className = warn.length? 'warn':'warn hide';
   $('parseWarn').textContent = warn.join(' ');
   buildRows(); renderAll();
-  $('empty').className='hide'; $('tabs').className='tabs'; showTab('dash');
+  $('empty').className='hide'; $('tabs').className='tabs'; showTab(curTab());
   if(DRIVE.connected) buildDriveLinks(); else maybeAutoConnectDrive();
 
   function pick(list,re){for(var i=0;i<list.length;i++){if(re.test(list[i].n))return list[i];}return null;}
@@ -1454,7 +1521,7 @@ function sampleData(){
   RAW=out; SRC='Sample data (not your branches)'; TYPES=['Commercial','Fire','Signboard'];
   $('parseWarn').className='warn hide';
   buildRows(); renderAll();
-  $('empty').className='hide'; $('tabs').className='tabs'; showTab('dash');
+  $('empty').className='hide'; $('tabs').className='tabs'; showTab(curTab());
   if(DRIVE.connected) buildDriveLinks(); else maybeAutoConnectDrive();
 }
 
@@ -1717,7 +1784,7 @@ function applyScan(){
   });
   SRC = SRC? SRC+' + PDF scan' : 'PDF scan';
   buildRows(); renderAll();
-  $('empty').className='hide'; $('tabs').className='tabs'; showTab('dash');
+  $('empty').className='hide'; $('tabs').className='tabs'; showTab(curTab());
   if(DRIVE.connected) buildDriveLinks(); else maybeAutoConnectDrive();
   $('parseWarn').className = skipped? 'warn':'warn hide';
   $('parseWarn').textContent = skipped? skipped+' file'+(skipped>1?'s were':' was')+' left out — fill in the missing branch, type or date in the scan panel and apply again.' : '';
@@ -2071,8 +2138,8 @@ function driveConnect(){
       reg = inFolder || {drive:true,id:DRIVE_SHEET_ID,name:'License tracker',
                          mime:SHEET_MIME,path:'License tracker'};
     }
-    if(reg && !ROWS.length) loadDriveRegister(reg,null);
-    else if(!reg && !ROWS.length)
+    if(reg) loadDriveRegister(reg,null);          // always re-read, so Reload shows fresh dates
+    else if(!ROWS.length)
       drvSay('bad','no register','No spreadsheet found in the Drive folder. Put the licence tracker (.xlsx or .csv) into BEC LICENSES and press Refresh.','Nothing to load yet');
     try{ history.replaceState(null,'','#drive='+fid+'&key='+encodeURIComponent(key)); }catch(e){}
     if(ROWS.length) buildDriveLinks();
@@ -2202,6 +2269,7 @@ function loadSheet(it,done){
             var rows=j.values||[];
             if(!rows.length) throw new Error('The "'+pick+'" tab is empty.');
             ingest(rowsToObjects(rows), 'Drive · '+it.name+' · '+pick);
+            loadRenewals();
             done(true);
           });
         });
@@ -2235,6 +2303,7 @@ function driveFromHash(){
 driveFromHash();
 /* ============ tabs ============ */
 var ADMIN_TABS={branch:1,users:1};
+function curTab(){ var c=document.querySelector('.tab.on'); return c? c.dataset.tab : 'dash'; }
 function tabAllowed(n){ return !ADMIN_TABS[n] || AUTH.role==='admin'; }
 function showTab(name){
   if(!tabAllowed(name)) name='dash';
@@ -2245,6 +2314,8 @@ function showTab(name){
   $('uploadTab').className = name==='upload' ? '' : 'hide';
   $('branchTab').className = name==='branch' ? '' : 'hide';
   $('usersTab').className = name==='users' ? '' : 'hide';
+  $('renewTab').className = name==='renew' ? '' : 'hide';
+  if(name==='renew') renderRenewals();
   if(name==='users'){ cancelEdit(); renderUsers(); usBadge(); }
   if(name==='upload'){ fillUploadBranches(); upBadge(); }
   if(name==='branch'){ buildBranchGrid(); brBadge(); fillDeleteBranches(); }
@@ -2376,6 +2447,9 @@ function doUpload(){
     }
     var existing=FILES[copyKey(b,t)];
     var name=upName();
+    var rrow=ROWS.filter(function(x){return x.branch===b;})[0];
+    var rcell=rrow && rrow.cells[t];
+    var prevDate=rcell && rcell.date ? rcell.date : null, prevNA=!!(rcell && rcell.na);
     $('btnUpload').disabled=true;
     upSay('Uploading '+name+' …');
 
@@ -2390,10 +2464,18 @@ function doUpload(){
             upSay(ok2? 'Tracker updated · '+msg : 'Tracker NOT updated: '+msg, ok2?'ok':'er');
             if(ok2 && TRACKER_WARN) upSay('Note: '+TRACKER_WARN,'er');
             if(!ok2) upSay('The PDF was replaced, but the expiry date still needs changing in the spreadsheet.','er');
-            finish();
+            record(ok2? d : null);
           });
-        } else finish();
+        } else record(null);
       } else upSay('Upload failed: '+detail,'er');
+      function record(newDate){
+        logRenewal({code:rrow&&rrow.code, branch:b, type:t, prev:prevDate, prevNA:prevNA,
+                    next:newDate, file:name}, tok, function(ok3,m3){
+          if(ok3) upSay(newDate? 'Logged on the Renewals tab.' : 'Copy replacement logged.','ok');
+          else upSay('Renewal not logged: '+m3,'er');
+          finish();
+        });
+      }
       function finish(){
         setTimeout(function(){ driveConnect(); }, 800);
         upSetFile(null); $('upFile').value=''; $('upExpiry').value='';
@@ -2507,7 +2589,7 @@ function sheetsUpdate(reg,branch,type,date,tok,cb){
       return fetch('https://sheets.googleapis.com/v4/spreadsheets/'+reg.id+'/values/'+
                    encodeURIComponent(a1)+'?valueInputOption=USER_ENTERED',
         {method:'PUT',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
-         body:JSON.stringify({values:[[dmy(date)]]})})
+         body:JSON.stringify({values:[[isoDate(date)]]})})
         .then(function(r){
           if(!r.ok) return r.text().then(function(x){ throw new Error(x.slice(0,140)); });
           cb(true,a1+' set to '+fmt(date)+' — nothing else in the sheet was touched');
@@ -2738,7 +2820,7 @@ function sheetAddRow(code,name,vals,tok,cb){
       BR_CATS.forEach(function(cat){
         var v=vals[cat], ec=col[cat+'_exp'], nc=col[cat+'_no'];
         if(ec===undefined) return;
-        out[ec]= v.na? 'Not Applicable' : (v.date? dmy(v.date) : '');
+        out[ec]= v.na? 'Not Applicable' : (v.date? isoDate(v.date) : '');
         if(nc!==undefined) out[nc]= v.na? '**' : (v.no||'');
       });
       var a1=(tab? "'"+tab.replace(/'/g,"''")+"'!" : '')+'A'+(target+1);
@@ -3122,6 +3204,170 @@ function removeUser(u,builtin){
   });
 }
 
+
+/* ============ renewal log (Sheet tab "Renewals") ============ */
+var RENEW_TAB='Renewals';
+var RENEWALS=[];
+var RN={days:0};
+var RENEW_HEAD=['Renewed on','Branch code','Branch name','Licence','Previous expiry',
+                'New expiry','Renewed by','File','Kind'];
+
+function isoDate(d){
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+function isoStamp(d){
+  return isoDate(d)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+}
+function sheetId(){ return DRIVE_SHEET_ID || (DRIVE.register && DRIVE.register.id) || ''; }
+
+function loadRenewals(cb){
+  var id=sheetId();
+  if(!id){ RENEWALS=[]; if(cb) cb(); return; }
+  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+id+'/values/'+encodeURIComponent(RENEW_TAB)+
+        '?valueRenderOption=UNFORMATTED_VALUE&key='+encodeURIComponent(DRIVE.key||DRIVE_API_KEY))
+    .then(function(r){ return r.ok? r.json() : null; })
+    .then(function(j){
+      var rows=(j&&j.values)||[], out=[];
+      rows.forEach(function(r,i){
+        if(i===0 && /renew/i.test(String(r[0]||''))) return;
+        var when=String(r[0]||'').trim(); if(!when) return;
+        var tm=when.match(/(\d{1,2}):(\d{2})/);
+        var d=parseDate(when); if(!d) return;
+        if(tm){ d=new Date(d.getTime()); d.setHours(+tm[1],+tm[2]); }
+        out.push({when:d, code:String(r[1]||'').trim(), branch:String(r[2]||'').trim(),
+          type:String(r[3]||'').trim(), prev:r[4], next:r[5],
+          by:String(r[6]||'').trim(), file:String(r[7]||'').trim(),
+          kind:String(r[8]||'Renewed').trim().toLowerCase()==='renewed'?'renewed':'copy'});
+      });
+      out.sort(function(a,b){ return b.when-a.when; });
+      RENEWALS=out;
+    })
+    .catch(function(){})
+    .then(function(){ if(cb) cb(); renderRenewals(); });
+}
+
+function ensureTab(title,header,tok,cb){
+  DRIVE.sheetIds=DRIVE.sheetIds||{};
+  if(DRIVE.sheetIds[title]!==undefined) return cb(true);
+  var id=sheetId();
+  fetch('https://sheets.googleapis.com/v4/spreadsheets/'+id+':batchUpdate',
+    {method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+     body:JSON.stringify({requests:[{addSheet:{properties:{title:title}}}]})})
+    .then(function(r){ return r.json().then(function(j){
+      if(!r.ok){
+        if(/already exists/i.test(JSON.stringify(j))){ DRIVE.sheetIds[title]=-1; return cb(true); }
+        throw new Error((j.error&&j.error.message)||'could not create the '+title+' tab');
+      }
+      var pr=j.replies&&j.replies[0]&&j.replies[0].addSheet&&j.replies[0].addSheet.properties;
+      if(pr) DRIVE.sheetIds[title]=pr.sheetId;
+      return fetch('https://sheets.googleapis.com/v4/spreadsheets/'+id+'/values/'+
+                   encodeURIComponent("'"+title+"'!A1")+'?valueInputOption=RAW',
+        {method:'PUT',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+         body:JSON.stringify({values:[header]})}).then(function(){ cb(true); });
+    }); })
+    .catch(function(e){ cb(false,e.message); });
+}
+
+function logRenewal(e,tok,cb){
+  ensureTab(RENEW_TAB,RENEW_HEAD,tok,function(ok,msg){
+    if(!ok){ cb(false,msg); return; }
+    var row=[isoStamp(new Date()), e.code||'', e.branch, e.type,
+             e.prev? isoDate(e.prev) : (e.prevNA? 'Not Applicable':''),
+             e.next? isoDate(e.next) : '', AUTH.user||AUTH.uname||'', e.file||'',
+             e.next? 'Renewed' : 'Copy replaced'];
+    fetch('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId()+'/values/'+
+          encodeURIComponent("'"+RENEW_TAB+"'!A1")+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',
+      {method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},
+       body:JSON.stringify({values:[row]})})
+      .then(function(r){
+        if(!r.ok) return r.text().then(function(x){ throw new Error(x.slice(0,120)); });
+        cb(true);
+      })
+      .catch(function(err){ cb(false,err.message); });
+  });
+}
+
+function rnFiltered(){
+  var q=($('rnQ').value||'').toLowerCase().trim(), ty=$('rnType').value, kind=$('rnKind').value;
+  var cutoff = RN.days? TODAY.getTime()-RN.days*86400000 : 0;
+  return RENEWALS.filter(function(r){
+    if(kind && r.kind!==kind) return false;
+    if(ty && r.type!==ty) return false;
+    if(cutoff && r.when.getTime()<cutoff) return false;
+    if(q && (r.branch+' '+r.code+' '+r.type+' '+r.file+' '+r.by).toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+}
+function monthsBetween(a,b){
+  var m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());
+  if(b.getDate()<a.getDate()) m--;
+  return m;
+}
+function renderRenewals(){
+  if(!$('rnBody')) return;
+  var only=RENEWALS.filter(function(r){return r.kind==='renewed';});
+  var cnt=function(days){ var c=TODAY.getTime()-days*86400000;
+    return only.filter(function(r){return r.when.getTime()>=c;}).length; };
+  $('rn30').textContent=cnt(30); $('rn90').textContent=cnt(90);
+  $('rn365').textContent=cnt(365); $('rnAll').textContent=only.length;
+  $('rnBadge').textContent=only.length+' renewal'+(only.length===1?'':'s');
+  document.querySelectorAll('.rn-kpi').forEach(function(k){
+    k.className='rn-kpi'+(+k.dataset.days===RN.days?' on':'');
+  });
+
+  var list=rnFiltered(), body=$('rnBody'); body.innerHTML='';
+  if(!list.length){
+    body.innerHTML='<tr><td colspan="8" class="rn-empty">'+
+      (RENEWALS.length? 'No renewals match these filters.' :
+       'No renewals recorded yet. From now on, uploading a licence on the Upload licence tab with a new expiry date adds it here.')+
+      '</td></tr>';
+  }
+  list.forEach(function(r){
+    var row=ROWS.filter(function(x){ return (r.code && String(x.code||'').toUpperCase()===r.code.toUpperCase()) ||
+                                            x.branch.toUpperCase()===r.branch.toUpperCase(); })[0];
+    var prev = r.prev===''||r.prev==null? null : (isNA(r.prev)? 'na' : parseDate(r.prev));
+    var next = r.next===''||r.next==null? null : parseDate(r.next);
+    var ext='—';
+    if(prev && prev!=='na' && next){
+      var m=monthsBetween(prev,next);
+      ext = m>=12? '+'+Math.floor(m/12)+'y '+(m%12)+'m' : (m>0? '+'+m+' months' : '+'+Math.round((next-prev)/86400000)+' days');
+    } else if(next) ext='new';
+    var tr=document.createElement('tr');
+    tr.innerHTML=
+      '<td data-l="Renewed">'+fmt(r.when)+'<span class="rn-kind">'+
+        ('0'+r.when.getHours()).slice(-2)+':'+('0'+r.when.getMinutes()).slice(-2)+
+        (r.kind==='copy'? ' · copy replaced':'')+'</span></td>'+
+      '<td class="rn-br" data-l="Branch"><span class="br-name">'+esc(row? row.branch : r.branch)+'</span>'+
+        (r.code? '<span class="br-sub">'+esc(r.code)+'</span>':'')+'</td>'+
+      '<td data-l="Licence">'+esc(r.type)+'</td>'+
+      '<td data-l="Previous"><span class="old mono">'+
+        (prev==='na'? 'Not applicable' : prev? fmt(prev) : '—')+'</span></td>'+
+      '<td data-l="New expiry">'+(next? '<span class="mono">'+fmt(next)+'</span> <span class="tag t-'+
+        bucketOf(daysTo(next))+'" style="margin:0 0 0 4px">'+tagText(daysTo(next))+'</span>' : '—')+'</td>'+
+      '<td data-l="Extended"><span class="rn-plus">'+ext+'</span></td>'+
+      '<td data-l="By">'+esc(r.by||'—')+'</td>';
+    var tdc=document.createElement('td'); tdc.setAttribute('data-l','Copy');
+    var f=row? FILES[copyKey(row.branch,r.type)] : null;
+    if(f) tdc.appendChild(copyChip(f,row.branch,r.type));
+    else tdc.innerHTML='<span class="cell-empty">—</span>';
+    tr.appendChild(tdc);
+    body.appendChild(tr);
+  });
+  $('rnCount').textContent=list.length+' of '+RENEWALS.length+' entries shown';
+  $('rnSrc').textContent=only.length? 'latest renewal: '+fmt(only[0].when) : '';
+}
+function exportRenewals(){
+  var rows=[['Renewed on','Branch code','Branch','Licence','Previous expiry','New expiry','Renewed by','Kind']];
+  rnFiltered().forEach(function(r){
+    var p=parseDate(r.prev), n=parseDate(r.next);
+    rows.push([isoStamp(r.when),r.code,r.branch,r.type,
+      isNA(r.prev)?'Not applicable':(p?fmt(p):''), n?fmt(n):'', r.by, r.kind==='renewed'?'Renewed':'Copy replaced']);
+  });
+  download(rows.map(function(r){return r.map(function(v){
+    v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(',');}).join('\n'),
+    'licence-renewals-'+isoDate(new Date())+'.csv');
+}
+
 /* ============ wiring ============ */
 $('btnSignOut').onclick=function(){
   if(confirm('Sign out of the licence dashboard?')) signOut();
@@ -3164,6 +3410,12 @@ $('btnUpload').onclick=doUpload;
 $('btnUpDownload').onclick=downloadRenamed;
 $('btnAddBranch').onclick=addBranch;
 $('btnSaveUser').onclick=saveUser;
+$('btnGoRenew').onclick=function(){ showTab('renew'); window.scrollTo(0,0); };
+$('btnRnExport').onclick=exportRenewals;
+['rnQ','rnType','rnKind'].forEach(function(id){ $(id).oninput=$(id).onchange=renderRenewals; });
+document.querySelectorAll('.rn-kpi').forEach(function(k){
+  k.onclick=function(){ RN.days=+k.dataset.days; renderRenewals(); };
+});
 $('btnCancelEdit').onclick=cancelEdit;
 $('delBranch').onchange=delSummary;
 $('btnDelBranch').onclick=openConfirm;
