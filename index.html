@@ -740,7 +740,7 @@ body.locked{overflow:hidden}
       <div class="panel-head">
         <div>
           <h2>Renewed licences</h2>
-          <span class="sub">Every licence renewed through the Upload licence tab &mdash; newest first. Kept on the &ldquo;Renewals&rdquo; tab of the tracker Sheet.</span>
+          <span class="sub">Licences whose expiry date was updated &mdash; whether edited in the Google Sheet or uploaded here. Newest first.</span>
         </div>
         <span class="pill good" id="rnBadge">0 renewals</span>
       </div>
@@ -758,7 +758,7 @@ body.locked{overflow:hidden}
         </select>
         <select id="rnKind">
           <option value="renewed">Renewals only</option>
-          <option value="">Include copy replacements</option>
+          <option value="">Include copy replacements &amp; corrections</option>
         </select>
         <span class="spacer"></span>
         <button class="btn" id="btnRnExport">Export CSV</button>
@@ -3234,10 +3234,13 @@ function loadRenewals(cb){
         var tm=when.match(/(\d{1,2}):(\d{2})/);
         var d=parseDate(when); if(!d) return;
         if(tm){ d=new Date(d.getTime()); d.setHours(+tm[1],+tm[2]); }
-        out.push({when:d, code:String(r[1]||'').trim(), branch:String(r[2]||'').trim(),
+        var kd=String(r[8]||'Renewed').trim().toLowerCase();
+        var file=String(r[7]||'').trim();
+        out.push({when:d, hasTime:!!tm, code:String(r[1]||'').trim(), branch:String(r[2]||'').trim(),
           type:String(r[3]||'').trim(), prev:r[4], next:r[5],
-          by:String(r[6]||'').trim(), file:String(r[7]||'').trim(),
-          kind:String(r[8]||'Renewed').trim().toLowerCase()==='renewed'?'renewed':'copy'});
+          by:String(r[6]||'').trim(), file:file,
+          fromSheet:/^\(/.test(file), note:(file.match(/^\((.*)\)$/)||[])[1]||'',
+          kind: kd==='renewed'? 'renewed' : (/correct/.test(kd)? 'corrected' : 'copy')});
       });
       out.sort(function(a,b){ return b.when-a.when; });
       RENEWALS=out;
@@ -3319,7 +3322,7 @@ function renderRenewals(){
   if(!list.length){
     body.innerHTML='<tr><td colspan="8" class="rn-empty">'+
       (RENEWALS.length? 'No renewals match these filters.' :
-       'No renewals recorded yet. From now on, uploading a licence on the Upload licence tab with a new expiry date adds it here.')+
+       'No renewals recorded yet. They appear here when an expiry date is changed in the Google Sheet or a licence is uploaded with a new date.')+
       '</td></tr>';
   }
   list.forEach(function(r){
@@ -3330,13 +3333,15 @@ function renderRenewals(){
     var ext='—';
     if(prev && prev!=='na' && next){
       var m=monthsBetween(prev,next);
-      ext = m>=12? '+'+Math.floor(m/12)+'y '+(m%12)+'m' : (m>0? '+'+m+' months' : '+'+Math.round((next-prev)/86400000)+' days');
+      ext = m>=12? '+'+Math.floor(m/12)+'y '+(m%12)+'m' : (m>0? '+'+m+(m===1?' month':' months') : '+'+Math.round((next-prev)/86400000)+' days');
     } else if(next) ext='new';
     var tr=document.createElement('tr');
     tr.innerHTML=
       '<td data-l="Renewed">'+fmt(r.when)+'<span class="rn-kind">'+
-        ('0'+r.when.getHours()).slice(-2)+':'+('0'+r.when.getMinutes()).slice(-2)+
-        (r.kind==='copy'? ' · copy replaced':'')+'</span></td>'+
+        [r.hasTime? ('0'+r.when.getHours()).slice(-2)+':'+('0'+r.when.getMinutes()).slice(-2) : '',
+         r.fromSheet? (/found in sheet/i.test(r.note)? 'found in Sheet · date approx.' : 'edited in Sheet') : 'uploaded',
+         r.kind==='copy'? 'copy replaced' : r.kind==='corrected'? 'date corrected' : '']
+          .filter(Boolean).join(' · ')+'</span></td>'+
       '<td class="rn-br" data-l="Branch"><span class="br-name">'+esc(row? row.branch : r.branch)+'</span>'+
         (r.code? '<span class="br-sub">'+esc(r.code)+'</span>':'')+'</td>'+
       '<td data-l="Licence">'+esc(r.type)+'</td>'+
@@ -3345,7 +3350,7 @@ function renderRenewals(){
       '<td data-l="New expiry">'+(next? '<span class="mono">'+fmt(next)+'</span> <span class="tag t-'+
         bucketOf(daysTo(next))+'" style="margin:0 0 0 4px">'+tagText(daysTo(next))+'</span>' : '—')+'</td>'+
       '<td data-l="Extended"><span class="rn-plus">'+ext+'</span></td>'+
-      '<td data-l="By">'+esc(r.by||'—')+'</td>';
+      '<td data-l="By">'+esc((r.by||'—').replace(/@.*$/,''))+'</td>';
     var tdc=document.createElement('td'); tdc.setAttribute('data-l','Copy');
     var f=row? FILES[copyKey(row.branch,r.type)] : null;
     if(f) tdc.appendChild(copyChip(f,row.branch,r.type));
@@ -3357,11 +3362,13 @@ function renderRenewals(){
   $('rnSrc').textContent=only.length? 'latest renewal: '+fmt(only[0].when) : '';
 }
 function exportRenewals(){
-  var rows=[['Renewed on','Branch code','Branch','Licence','Previous expiry','New expiry','Renewed by','Kind']];
+  var rows=[['Renewed on','Branch code','Branch','Licence','Previous expiry','New expiry','Renewed by','Kind','Source']];
   rnFiltered().forEach(function(r){
     var p=parseDate(r.prev), n=parseDate(r.next);
-    rows.push([isoStamp(r.when),r.code,r.branch,r.type,
-      isNA(r.prev)?'Not applicable':(p?fmt(p):''), n?fmt(n):'', r.by, r.kind==='renewed'?'Renewed':'Copy replaced']);
+    rows.push([r.hasTime? isoStamp(r.when) : isoDate(r.when),r.code,r.branch,r.type,
+      isNA(r.prev)?'Not applicable':(p?fmt(p):''), n?fmt(n):'', r.by,
+      r.kind==='renewed'?'Renewed':r.kind==='corrected'?'Date corrected':'Copy replaced',
+      r.fromSheet? (r.note||'Sheet edit') : 'Uploaded on dashboard']);
   });
   download(rows.map(function(r){return r.map(function(v){
     v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(',');}).join('\n'),
